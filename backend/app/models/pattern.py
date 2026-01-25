@@ -1,7 +1,6 @@
 """Pattern models for ML-based lead analysis."""
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import (
     Boolean,
@@ -11,7 +10,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -48,22 +46,22 @@ class LeadPattern(Base, TimestampMixin):
 
     # Pattern Stats
     total_matches: Mapped[int] = mapped_column(Integer, default=0)
-    conversion_rate: Mapped[Optional[float]] = mapped_column(Float)  # Historical rate
-    avg_deal_size: Mapped[Optional[float]] = mapped_column(Float)
-    avg_sales_cycle_days: Mapped[Optional[int]] = mapped_column(Integer)
+    conversion_rate: Mapped[float | None] = mapped_column(Float)  # Historical rate
+    avg_deal_size: Mapped[float | None] = mapped_column(Float)
+    avg_sales_cycle_days: Mapped[int | None] = mapped_column(Integer)
 
     # Sample Leads (IDs of leads that match this pattern)
-    sample_lead_ids: Mapped[Optional[list]] = mapped_column(ARRAY(Integer))
+    sample_lead_ids: Mapped[list | None] = mapped_column(ARRAY(Integer))
 
     # Best Practices
-    recommended_approach: Mapped[Optional[str]] = mapped_column(Text)
-    best_first_touch: Mapped[Optional[str]] = mapped_column(String(50))  # email, call, linkedin
-    optimal_cadence: Mapped[Optional[dict]] = mapped_column(JSONB)
+    recommended_approach: Mapped[str | None] = mapped_column(Text)
+    best_first_touch: Mapped[str | None] = mapped_column(String(50))  # email, call, linkedin
+    optimal_cadence: Mapped[dict | None] = mapped_column(JSONB)
 
     # Effectiveness Tracking
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    confidence_score: Mapped[Optional[float]] = mapped_column(Float)  # Model confidence
-    last_validated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    confidence_score: Mapped[float | None] = mapped_column(Float)  # Model confidence
+    last_validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Source Attribution
     discovered_by: Mapped[str] = mapped_column(
@@ -112,25 +110,25 @@ class WinLossPattern(Base, TimestampMixin):
 
     # Statistics
     occurrences: Mapped[int] = mapped_column(Integer, default=0)
-    avg_deal_size: Mapped[Optional[float]] = mapped_column(Float)
-    industries: Mapped[Optional[list]] = mapped_column(ARRAY(String))
-    company_sizes: Mapped[Optional[list]] = mapped_column(ARRAY(String))
+    avg_deal_size: Mapped[float | None] = mapped_column(Float)
+    industries: Mapped[list | None] = mapped_column(ARRAY(String))
+    company_sizes: Mapped[list | None] = mapped_column(ARRAY(String))
 
     # Associated Conversations (Clari IDs that informed this pattern)
-    source_conversation_ids: Mapped[Optional[list]] = mapped_column(ARRAY(Integer))
+    source_conversation_ids: Mapped[list | None] = mapped_column(ARRAY(Integer))
 
     # AE Attribution (which AEs exhibited this pattern)
-    ae_names: Mapped[Optional[list]] = mapped_column(ARRAY(String))
+    ae_names: Mapped[list | None] = mapped_column(ARRAY(String))
 
     # Coaching Recommendations
-    coaching_notes: Mapped[Optional[str]] = mapped_column(Text)
-    prevention_strategy: Mapped[Optional[str]] = mapped_column(Text)  # For loss patterns
-    replication_strategy: Mapped[Optional[str]] = mapped_column(Text)  # For win patterns
+    coaching_notes: Mapped[str | None] = mapped_column(Text)
+    prevention_strategy: Mapped[str | None] = mapped_column(Text)  # For loss patterns
+    replication_strategy: Mapped[str | None] = mapped_column(Text)  # For win patterns
 
     # Validation
     is_validated: Mapped[bool] = mapped_column(Boolean, default=False)
-    validated_by: Mapped[Optional[str]] = mapped_column(String(100))
-    validated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    validated_by: Mapped[str | None] = mapped_column(String(100))
+    validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         Index("ix_winloss_type_occurrences", "is_win_pattern", "occurrences"),

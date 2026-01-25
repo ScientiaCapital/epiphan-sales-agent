@@ -2,19 +2,18 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import (
     Boolean,
+    DateTime,
     Float,
     Index,
     Integer,
     String,
     Text,
     func,
-    DateTime,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -90,37 +89,37 @@ class ICPScore(Base, TimestampMixin):
 
     # Lead Reference
     lead_id: Mapped[int] = mapped_column(Integer, index=True)
-    hubspot_id: Mapped[Optional[str]] = mapped_column(String(50), index=True)
+    hubspot_id: Mapped[str | None] = mapped_column(String(50), index=True)
 
     # Vertical Classification
-    primary_vertical: Mapped[Optional[Vertical]] = mapped_column(String(30), index=True)
-    secondary_verticals: Mapped[Optional[list]] = mapped_column(ARRAY(String))
-    vertical_confidence: Mapped[Optional[float]] = mapped_column(Float)
+    primary_vertical: Mapped[Vertical | None] = mapped_column(String(30), index=True)
+    secondary_verticals: Mapped[list | None] = mapped_column(ARRAY(String))
+    vertical_confidence: Mapped[float | None] = mapped_column(Float)
 
     # Persona Match
-    primary_persona: Mapped[Optional[PersonaType]] = mapped_column(String(30))
-    persona_confidence: Mapped[Optional[float]] = mapped_column(Float)
+    primary_persona: Mapped[PersonaType | None] = mapped_column(String(30))
+    persona_confidence: Mapped[float | None] = mapped_column(Float)
 
     # Product Fit
-    recommended_product: Mapped[Optional[ProductFit]] = mapped_column(String(30))
-    product_fit_reasoning: Mapped[Optional[str]] = mapped_column(Text)
+    recommended_product: Mapped[ProductFit | None] = mapped_column(String(30))
+    product_fit_reasoning: Mapped[str | None] = mapped_column(Text)
 
     # ICP Attribute Scores (0-100)
-    company_size_score: Mapped[Optional[float]] = mapped_column(Float)
-    budget_authority_score: Mapped[Optional[float]] = mapped_column(Float)
-    tech_maturity_score: Mapped[Optional[float]] = mapped_column(Float)
-    buying_intent_score: Mapped[Optional[float]] = mapped_column(Float)
+    company_size_score: Mapped[float | None] = mapped_column(Float)
+    budget_authority_score: Mapped[float | None] = mapped_column(Float)
+    tech_maturity_score: Mapped[float | None] = mapped_column(Float)
+    buying_intent_score: Mapped[float | None] = mapped_column(Float)
 
     # Higher Ed Specific
-    student_count: Mapped[Optional[int]] = mapped_column(Integer)
-    classroom_count: Mapped[Optional[int]] = mapped_column(Integer)
+    student_count: Mapped[int | None] = mapped_column(Integer)
+    classroom_count: Mapped[int | None] = mapped_column(Integer)
     has_lms: Mapped[bool] = mapped_column(Boolean, default=False)
-    lms_platform: Mapped[Optional[str]] = mapped_column(
+    lms_platform: Mapped[str | None] = mapped_column(
         String(50)
     )  # Panopto, Kaltura, YuJa
 
     # Corporate Specific
-    employee_count: Mapped[Optional[int]] = mapped_column(Integer)
+    employee_count: Mapped[int | None] = mapped_column(Integer)
     is_fortune_1000: Mapped[bool] = mapped_column(Boolean, default=False)
     has_hybrid_workforce: Mapped[bool] = mapped_column(Boolean, default=False)
     uses_zoom_teams: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -132,14 +131,14 @@ class ICPScore(Base, TimestampMixin):
 
     # Government Specific
     is_government: Mapped[bool] = mapped_column(Boolean, default=False)
-    population_served: Mapped[Optional[int]] = mapped_column(Integer)
+    population_served: Mapped[int | None] = mapped_column(Integer)
 
     # Overall Fit
-    overall_icp_score: Mapped[Optional[float]] = mapped_column(Float, index=True)
-    icp_reasoning: Mapped[Optional[str]] = mapped_column(Text)
+    overall_icp_score: Mapped[float | None] = mapped_column(Float, index=True)
+    icp_reasoning: Mapped[str | None] = mapped_column(Text)
 
     # Buying Signals Detected
-    buying_signals: Mapped[Optional[list]] = mapped_column(ARRAY(String))
+    buying_signals: Mapped[list | None] = mapped_column(ARRAY(String))
     # Examples: "new_construction", "ada_compliance", "panopto_expansion", etc.
 
     __table_args__ = (
@@ -180,11 +179,11 @@ class BuyingTrigger(Base, TimestampMixin):
 
     # Intent Level
     intent_level: Mapped[str] = mapped_column(String(20))  # high, medium, low
-    confidence: Mapped[Optional[float]] = mapped_column(Float)
+    confidence: Mapped[float | None] = mapped_column(Float)
 
     # Details
     description: Mapped[str] = mapped_column(Text)
-    source_url: Mapped[Optional[str]] = mapped_column(String(500))
+    source_url: Mapped[str | None] = mapped_column(String(500))
     detected_date: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=func.now()
     )
@@ -192,7 +191,7 @@ class BuyingTrigger(Base, TimestampMixin):
     # Follow-up
     requires_action: Mapped[bool] = mapped_column(Boolean, default=True)
     action_taken: Mapped[bool] = mapped_column(Boolean, default=False)
-    action_notes: Mapped[Optional[str]] = mapped_column(Text)
+    action_notes: Mapped[str | None] = mapped_column(Text)
 
     __table_args__ = (
         Index("ix_trigger_lead_type", "lead_id", "trigger_type"),
@@ -218,8 +217,8 @@ class CompetitorIntel(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     # Lead/Conversation Reference
-    lead_id: Mapped[Optional[int]] = mapped_column(Integer, index=True)
-    conversation_id: Mapped[Optional[int]] = mapped_column(Integer)
+    lead_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    conversation_id: Mapped[int | None] = mapped_column(Integer)
 
     # Competitor
     competitor_name: Mapped[str] = mapped_column(String(100), index=True)
@@ -230,8 +229,8 @@ class CompetitorIntel(Base, TimestampMixin):
     # Types: incumbent, evaluating, mentioned, replaced
 
     # Details
-    notes: Mapped[Optional[str]] = mapped_column(Text)
-    win_message: Mapped[Optional[str]] = mapped_column(Text)  # From battlecard
+    notes: Mapped[str | None] = mapped_column(Text)
+    win_message: Mapped[str | None] = mapped_column(Text)  # From battlecard
 
     # Outcome (if known)
     displaced_competitor: Mapped[bool] = mapped_column(Boolean, default=False)

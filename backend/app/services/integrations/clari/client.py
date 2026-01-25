@@ -1,7 +1,7 @@
 """Clari Copilot integration client for conversation intelligence."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -30,12 +30,12 @@ class ClariCopilotClient:
 
     async def get_conversations(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        ae_email: Optional[str] = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        ae_email: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Fetch conversation records from Clari Copilot.
 
@@ -67,7 +67,7 @@ class ClariCopilotClient:
 
     async def get_conversation_detail(
         self, conversation_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get detailed conversation data including transcript."""
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -79,7 +79,7 @@ class ClariCopilotClient:
 
     async def get_conversation_transcript(
         self, conversation_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get full transcript with speaker diarization."""
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -91,7 +91,7 @@ class ClariCopilotClient:
 
     async def get_conversation_insights(
         self, conversation_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get AI-extracted insights from a conversation.
 
@@ -113,9 +113,9 @@ class ClariCopilotClient:
     async def get_ae_performance(
         self,
         ae_email: str,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> dict[str, Any]:
         """
         Get performance metrics for a specific AE.
 
@@ -143,9 +143,9 @@ class ClariCopilotClient:
 
     async def get_team_analytics(
         self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> dict[str, Any]:
         """Get team-wide conversation analytics."""
         params = {}
         if start_date:
@@ -165,8 +165,8 @@ class ClariCopilotClient:
     async def search_conversations(
         self,
         query: str,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        filters: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Search conversations by keyword/phrase.
 
@@ -191,9 +191,9 @@ class ClariCopilotClient:
 
     async def get_deals_with_conversations(
         self,
-        deal_stage: Optional[str] = None,
-        outcome: Optional[str] = None,  # "won" or "lost"
-    ) -> Dict[str, Any]:
+        deal_stage: str | None = None,
+        outcome: str | None = None,  # "won" or "lost"
+    ) -> dict[str, Any]:
         """
         Get deals with their associated conversations.
 
@@ -214,7 +214,7 @@ class ClariCopilotClient:
             response.raise_for_status()
             return response.json()
 
-    def parse_conversation(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_conversation(self, raw_data: dict[str, Any]) -> dict[str, Any]:
         """Parse raw Clari response into our conversation model format."""
         return {
             "clari_id": raw_data.get("id"),

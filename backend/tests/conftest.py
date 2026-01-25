@@ -18,7 +18,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from httpx import AsyncClient
 
-
 # =============================================================================
 # Database Fixtures (example for Supabase/PostgreSQL)
 # =============================================================================
@@ -48,7 +47,7 @@ async def mock_db() -> AsyncGenerator[MagicMock, None]:
     db.execute = AsyncMock(return_value=[])
     db.fetch_one = AsyncMock(return_value=None)
     db.fetch_all = AsyncMock(return_value=[])
-    
+
     yield db
 
 
@@ -65,15 +64,14 @@ async def test_db_connection() -> AsyncGenerator[Any, None]:
             result = await create_lead(test_db_connection, lead_data)
             assert result.id is not None
     """
-    import os
     # In real implementation, you'd connect to your test database here
     # Example with asyncpg:
-    # 
+    #
     # import asyncpg
     # conn = await asyncpg.connect(os.getenv("TEST_DATABASE_URL"))
     # yield conn
     # await conn.close()
-    
+
     # For now, yield a mock - replace with real connection
     yield MagicMock()
 

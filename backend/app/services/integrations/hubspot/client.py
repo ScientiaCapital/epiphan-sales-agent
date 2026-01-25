@@ -1,14 +1,13 @@
 """HubSpot CRM integration client."""
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
-from hubspot import HubSpot
-from hubspot.crm.contacts import SimplePublicObjectInput
-from hubspot.crm.companies import SimplePublicObjectInput as CompanyInput
 
 from app.core.config import settings
+from hubspot import HubSpot
+from hubspot.crm.contacts import SimplePublicObjectInput
 
 
 class HubSpotClient:
@@ -29,9 +28,9 @@ class HubSpotClient:
     async def get_all_contacts(
         self,
         limit: int = 100,
-        properties: Optional[List[str]] = None,
-        after: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        properties: list[str] | None = None,
+        after: str | None = None,
+    ) -> dict[str, Any]:
         """
         Fetch contacts with pagination support.
 
@@ -70,7 +69,7 @@ class HubSpotClient:
             "paging": response.paging.to_dict() if response.paging else None,
         }
 
-    async def get_untouched_contacts(self, limit: int = 1000) -> List[Dict[str, Any]]:
+    async def get_untouched_contacts(self, limit: int = 1000) -> list[dict[str, Any]]:
         """
         Find contacts with no outreach (prime BDR targets).
 
@@ -113,7 +112,7 @@ class HubSpotClient:
 
         return [self._contact_to_dict(c) for c in response.results]
 
-    async def get_contact_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+    async def get_contact_by_email(self, email: str) -> dict[str, Any] | None:
         """Fetch a single contact by email."""
         try:
             response = self.client.crm.contacts.basic_api.get_by_id(
@@ -131,7 +130,7 @@ class HubSpotClient:
         except Exception:
             return None
 
-    async def create_contact(self, contact_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def create_contact(self, contact_data: dict[str, Any]) -> dict[str, Any]:
         """Create a new contact in HubSpot."""
         properties = {
             "email": contact_data.get("email"),
@@ -152,8 +151,8 @@ class HubSpotClient:
         return self._contact_to_dict(response)
 
     async def update_contact(
-        self, contact_id: str, properties: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, contact_id: str, properties: dict[str, Any]
+    ) -> dict[str, Any]:
         """Update an existing contact."""
         response = self.client.crm.contacts.basic_api.update(
             contact_id=contact_id,
@@ -162,8 +161,8 @@ class HubSpotClient:
         return self._contact_to_dict(response)
 
     async def get_companies(
-        self, limit: int = 100, after: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, limit: int = 100, after: str | None = None
+    ) -> dict[str, Any]:
         """Fetch companies with pagination."""
         response = self.client.crm.companies.basic_api.get_page(
             limit=limit,
@@ -186,8 +185,8 @@ class HubSpotClient:
         }
 
     async def get_deals(
-        self, limit: int = 100, after: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, limit: int = 100, after: str | None = None
+    ) -> dict[str, Any]:
         """Fetch deals for win/loss analysis."""
         response = self.client.crm.deals.basic_api.get_page(
             limit=limit,
@@ -214,8 +213,8 @@ class HubSpotClient:
         contact_id: str,
         activity_type: str,
         body: str,
-        timestamp: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
+        timestamp: datetime | None = None,
+    ) -> dict[str, Any]:
         """Log an engagement/activity on a contact."""
         engagement_data = {
             "engagement": {
@@ -229,13 +228,13 @@ class HubSpotClient:
         # Use engagements API
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                f"https://api.hubapi.com/engagements/v1/engagements",
+                "https://api.hubapi.com/engagements/v1/engagements",
                 headers={"Authorization": f"Bearer {settings.hubspot_access_token}"},
                 json=engagement_data,
             )
             return response.json()
 
-    def _contact_to_dict(self, contact) -> Dict[str, Any]:
+    def _contact_to_dict(self, contact) -> dict[str, Any]:
         """Convert HubSpot contact object to dictionary."""
         props = contact.properties
         return {
@@ -259,7 +258,7 @@ class HubSpotClient:
             "last_contacted": props.get("notes_last_contacted"),
         }
 
-    def _company_to_dict(self, company) -> Dict[str, Any]:
+    def _company_to_dict(self, company) -> dict[str, Any]:
         """Convert HubSpot company object to dictionary."""
         props = company.properties
         return {
@@ -274,7 +273,7 @@ class HubSpotClient:
             "country": props.get("country"),
         }
 
-    def _deal_to_dict(self, deal) -> Dict[str, Any]:
+    def _deal_to_dict(self, deal) -> dict[str, Any]:
         """Convert HubSpot deal object to dictionary."""
         props = deal.properties
         return {

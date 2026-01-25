@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from sqlalchemy import (
     Boolean,
@@ -11,9 +10,8 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    func,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -53,31 +51,31 @@ class LinkedInPost(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     # Content
-    title: Mapped[Optional[str]] = mapped_column(String(255))
+    title: Mapped[str | None] = mapped_column(String(255))
     content: Mapped[str] = mapped_column(Text)
     post_type: Mapped[PostType] = mapped_column(String(20), default=PostType.TEXT)
 
     # Media (if applicable)
-    media_urls: Mapped[Optional[list]] = mapped_column(ARRAY(String))
-    media_alt_text: Mapped[Optional[str]] = mapped_column(Text)
+    media_urls: Mapped[list | None] = mapped_column(ARRAY(String))
+    media_alt_text: Mapped[str | None] = mapped_column(Text)
 
     # Scheduling
     status: Mapped[PostStatus] = mapped_column(
         String(20), default=PostStatus.DRAFT, index=True
     )
-    scheduled_for: Mapped[Optional[datetime]] = mapped_column(
+    scheduled_for: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), index=True
     )
-    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # LinkedIn Reference
-    linkedin_post_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True)
-    linkedin_url: Mapped[Optional[str]] = mapped_column(String(500))
+    linkedin_post_id: Mapped[str | None] = mapped_column(String(100), unique=True)
+    linkedin_url: Mapped[str | None] = mapped_column(String(500))
 
     # Categorization
-    topic: Mapped[Optional[str]] = mapped_column(String(100), index=True)
-    tags: Mapped[Optional[list]] = mapped_column(ARRAY(String))
-    campaign: Mapped[Optional[str]] = mapped_column(String(100))
+    topic: Mapped[str | None] = mapped_column(String(100), index=True)
+    tags: Mapped[list | None] = mapped_column(ARRAY(String))
+    campaign: Mapped[str | None] = mapped_column(String(100))
 
     # Engagement Metrics (updated after publish)
     impressions: Mapped[int] = mapped_column(Integer, default=0)
@@ -85,17 +83,17 @@ class LinkedInPost(Base, TimestampMixin):
     comments: Mapped[int] = mapped_column(Integer, default=0)
     shares: Mapped[int] = mapped_column(Integer, default=0)
     clicks: Mapped[int] = mapped_column(Integer, default=0)
-    engagement_rate: Mapped[Optional[float]] = mapped_column(Integer)
+    engagement_rate: Mapped[float | None] = mapped_column(Integer)
 
     # Performance Notes
-    performance_notes: Mapped[Optional[str]] = mapped_column(Text)
-    what_worked: Mapped[Optional[str]] = mapped_column(Text)
+    performance_notes: Mapped[str | None] = mapped_column(Text)
+    what_worked: Mapped[str | None] = mapped_column(Text)
 
     # Epiphan Context
-    related_product: Mapped[Optional[str]] = mapped_column(
+    related_product: Mapped[str | None] = mapped_column(
         String(100)
     )  # Pearl, Webcaster, etc.
-    target_persona: Mapped[Optional[str]] = mapped_column(
+    target_persona: Mapped[str | None] = mapped_column(
         String(100)
     )  # Education, Broadcast, etc.
 
@@ -141,7 +139,7 @@ class LinkedInCadence(Base, TimestampMixin):
 
     # Analytics
     total_posts: Mapped[int] = mapped_column(Integer, default=0)
-    avg_engagement_rate: Mapped[Optional[float]] = mapped_column(Integer)
+    avg_engagement_rate: Mapped[float | None] = mapped_column(Integer)
 
     __table_args__ = (Index("ix_cadence_active", "is_active"),)
 
@@ -163,21 +161,21 @@ class LinkedInEngagement(Base, TimestampMixin):
     )  # like, comment, share, connect, message
 
     # Target
-    target_linkedin_url: Mapped[Optional[str]] = mapped_column(String(500))
-    target_name: Mapped[Optional[str]] = mapped_column(String(255))
-    target_company: Mapped[Optional[str]] = mapped_column(String(255))
-    target_title: Mapped[Optional[str]] = mapped_column(String(255))
+    target_linkedin_url: Mapped[str | None] = mapped_column(String(500))
+    target_name: Mapped[str | None] = mapped_column(String(255))
+    target_company: Mapped[str | None] = mapped_column(String(255))
+    target_title: Mapped[str | None] = mapped_column(String(255))
 
     # Content (for comments/messages)
-    content: Mapped[Optional[str]] = mapped_column(Text)
+    content: Mapped[str | None] = mapped_column(Text)
 
     # Related Lead
-    lead_id: Mapped[Optional[int]] = mapped_column(Integer, index=True)
+    lead_id: Mapped[int | None] = mapped_column(Integer, index=True)
 
     # Outcome
     response_received: Mapped[bool] = mapped_column(Boolean, default=False)
-    response_content: Mapped[Optional[str]] = mapped_column(Text)
-    response_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    response_content: Mapped[str | None] = mapped_column(Text)
+    response_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Metrics
     resulted_in_meeting: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -201,7 +199,7 @@ class LinkedInTemplate(Base, TimestampMixin):
 
     # Template Info
     name: Mapped[str] = mapped_column(String(255))
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
     template_type: Mapped[str] = mapped_column(
         String(30), index=True
     )  # post, connection_request, inmail, comment
@@ -211,13 +209,13 @@ class LinkedInTemplate(Base, TimestampMixin):
     # Variables: {{first_name}}, {{company}}, {{product}}, etc.
 
     # Categorization
-    persona: Mapped[Optional[str]] = mapped_column(String(100))  # Target audience
-    use_case: Mapped[Optional[str]] = mapped_column(String(100))
-    tags: Mapped[Optional[list]] = mapped_column(ARRAY(String))
+    persona: Mapped[str | None] = mapped_column(String(100))  # Target audience
+    use_case: Mapped[str | None] = mapped_column(String(100))
+    tags: Mapped[list | None] = mapped_column(ARRAY(String))
 
     # Performance
     times_used: Mapped[int] = mapped_column(Integer, default=0)
-    avg_response_rate: Mapped[Optional[float]] = mapped_column(Integer)
+    avg_response_rate: Mapped[float | None] = mapped_column(Integer)
 
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

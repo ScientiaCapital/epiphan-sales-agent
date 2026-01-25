@@ -1,9 +1,8 @@
 """Lead models for tracking BDR leads and audit trail."""
 
+import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Optional
-import uuid
 
 from sqlalchemy import (
     Boolean,
@@ -102,80 +101,80 @@ class Lead(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     # HubSpot Reference
-    hubspot_id: Mapped[Optional[str]] = mapped_column(
+    hubspot_id: Mapped[str | None] = mapped_column(
         String(50), unique=True, index=True
     )
-    hubspot_owner_id: Mapped[Optional[str]] = mapped_column(String(50))
+    hubspot_owner_id: Mapped[str | None] = mapped_column(String(50))
 
     # Company Info
     company_name: Mapped[str] = mapped_column(String(255), index=True)
-    company_website: Mapped[Optional[str]] = mapped_column(String(500))
-    company_domain: Mapped[Optional[str]] = mapped_column(String(255), index=True)
-    industry: Mapped[Optional[str]] = mapped_column(String(100))
-    company_size: Mapped[Optional[str]] = mapped_column(String(50))
-    employee_count: Mapped[Optional[int]] = mapped_column(Integer)
-    annual_revenue: Mapped[Optional[float]] = mapped_column(Numeric(15, 2))
+    company_website: Mapped[str | None] = mapped_column(String(500))
+    company_domain: Mapped[str | None] = mapped_column(String(255), index=True)
+    industry: Mapped[str | None] = mapped_column(String(100))
+    company_size: Mapped[str | None] = mapped_column(String(50))
+    employee_count: Mapped[int | None] = mapped_column(Integer)
+    annual_revenue: Mapped[float | None] = mapped_column(Numeric(15, 2))
 
     # Contact Info
-    contact_name: Mapped[Optional[str]] = mapped_column(String(255))
-    contact_email: Mapped[Optional[str]] = mapped_column(String(255), index=True)
-    contact_phone: Mapped[Optional[str]] = mapped_column(String(50))
-    contact_title: Mapped[Optional[str]] = mapped_column(String(255))
-    contact_linkedin: Mapped[Optional[str]] = mapped_column(String(500))
+    contact_name: Mapped[str | None] = mapped_column(String(255))
+    contact_email: Mapped[str | None] = mapped_column(String(255), index=True)
+    contact_phone: Mapped[str | None] = mapped_column(String(50))
+    contact_title: Mapped[str | None] = mapped_column(String(255))
+    contact_linkedin: Mapped[str | None] = mapped_column(String(500))
 
     # Location
-    city: Mapped[Optional[str]] = mapped_column(String(100))
-    state: Mapped[Optional[str]] = mapped_column(String(100))
-    country: Mapped[Optional[str]] = mapped_column(String(100))
+    city: Mapped[str | None] = mapped_column(String(100))
+    state: Mapped[str | None] = mapped_column(String(100))
+    country: Mapped[str | None] = mapped_column(String(100))
 
     # Lead Status
     status: Mapped[LeadStatus] = mapped_column(
         String(50), default=LeadStatus.NEW, index=True
     )
-    tier: Mapped[Optional[LeadTier]] = mapped_column(String(20), index=True)
+    tier: Mapped[LeadTier | None] = mapped_column(String(20), index=True)
 
     # AI Qualification Scores
-    qualification_score: Mapped[Optional[float]] = mapped_column(Float, index=True)
-    qualification_reasoning: Mapped[Optional[str]] = mapped_column(Text)
-    qualified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    qualification_score: Mapped[float | None] = mapped_column(Float, index=True)
+    qualification_reasoning: Mapped[str | None] = mapped_column(Text)
+    qualified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Epiphan-Specific Scoring (customize for your ICP)
-    video_production_score: Mapped[Optional[float]] = mapped_column(Float)
-    broadcast_score: Mapped[Optional[float]] = mapped_column(Float)
-    education_score: Mapped[Optional[float]] = mapped_column(Float)
-    enterprise_score: Mapped[Optional[float]] = mapped_column(Float)
+    video_production_score: Mapped[float | None] = mapped_column(Float)
+    broadcast_score: Mapped[float | None] = mapped_column(Float)
+    education_score: Mapped[float | None] = mapped_column(Float)
+    enterprise_score: Mapped[float | None] = mapped_column(Float)
 
     # Outreach Tracking
     has_been_contacted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    first_contact_date: Mapped[Optional[datetime]] = mapped_column(
+    first_contact_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
-    last_contact_date: Mapped[Optional[datetime]] = mapped_column(
+    last_contact_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
     contact_count: Mapped[int] = mapped_column(Integer, default=0)
 
     # Email Analysis
-    email_domain_quality: Mapped[Optional[str]] = mapped_column(
+    email_domain_quality: Mapped[str | None] = mapped_column(
         String(20)
     )  # corporate, personal, invalid
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Pattern Matching
-    matched_pattern_id: Mapped[Optional[int]] = mapped_column(Integer)
-    conversion_probability: Mapped[Optional[float]] = mapped_column(Float)
+    matched_pattern_id: Mapped[int | None] = mapped_column(Integer)
+    conversion_probability: Mapped[float | None] = mapped_column(Float)
 
     # Source Tracking
-    lead_source: Mapped[Optional[str]] = mapped_column(String(100))
-    utm_source: Mapped[Optional[str]] = mapped_column(String(100))
-    utm_campaign: Mapped[Optional[str]] = mapped_column(String(100))
+    lead_source: Mapped[str | None] = mapped_column(String(100))
+    utm_source: Mapped[str | None] = mapped_column(String(100))
+    utm_campaign: Mapped[str | None] = mapped_column(String(100))
 
     # Enrichment Data (JSON blob from Apollo/Clearbit)
-    enrichment_data: Mapped[Optional[dict]] = mapped_column(JSONB)
-    enriched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    enrichment_data: Mapped[dict | None] = mapped_column(JSONB)
+    enriched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Sync Metadata
-    last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sync_status: Mapped[str] = mapped_column(String(20), default="pending")
 
     __table_args__ = (
@@ -199,27 +198,27 @@ class LeadAuditLog(Base):
     )
 
     # Lead Reference
-    lead_id: Mapped[Optional[int]] = mapped_column(Integer, index=True)
-    company_name: Mapped[Optional[str]] = mapped_column(String(255), index=True)
-    hubspot_id: Mapped[Optional[str]] = mapped_column(String(50), index=True)
+    lead_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    company_name: Mapped[str | None] = mapped_column(String(255), index=True)
+    hubspot_id: Mapped[str | None] = mapped_column(String(50), index=True)
 
     # Event Details
     event_type: Mapped[LeadAuditEvent] = mapped_column(String(50), index=True)
     stage: Mapped[LeadAuditStage] = mapped_column(String(30), index=True)
 
     # Decision Data (what the agent decided and why)
-    decision_data: Mapped[Optional[dict]] = mapped_column(JSONB)
+    decision_data: Mapped[dict | None] = mapped_column(JSONB)
 
     # Performance Metrics
-    latency_ms: Mapped[Optional[int]] = mapped_column(Integer)
-    cost_usd: Mapped[Optional[float]] = mapped_column(Numeric(10, 6))
+    latency_ms: Mapped[int | None] = mapped_column(Integer)
+    cost_usd: Mapped[float | None] = mapped_column(Numeric(10, 6))
 
     # Agent Attribution
-    agent_type: Mapped[Optional[str]] = mapped_column(String(50))
-    llm_provider: Mapped[Optional[str]] = mapped_column(String(30))
+    agent_type: Mapped[str | None] = mapped_column(String(50))
+    llm_provider: Mapped[str | None] = mapped_column(String(30))
 
     # Session Tracking (groups related events)
-    session_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True))
+    session_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
 
     # Timestamp
     created_at: Mapped[datetime] = mapped_column(

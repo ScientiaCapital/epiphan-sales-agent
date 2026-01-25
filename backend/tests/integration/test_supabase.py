@@ -27,16 +27,15 @@ Usage:
 from __future__ import annotations
 
 import os
-from typing import Generator
-from unittest.mock import AsyncMock, MagicMock, patch
+from collections.abc import Generator
+from unittest.mock import MagicMock
 
 import pytest
 
 # Skip all tests if supabase is not installed
 pytest.importorskip("supabase")
 
-from supabase import create_client, Client
-
+from supabase import Client, create_client
 
 # -----------------------------------------------------------------
 # Fixtures
