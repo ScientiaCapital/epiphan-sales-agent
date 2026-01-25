@@ -4,8 +4,47 @@ Based on TypeScript interfaces from epiphan-bdr-playbook/study-app/data.
 """
 
 from enum import Enum
-from typing import Optional
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel, ConfigDict, Field
+
+__all__ = [
+    # Enums
+    "Vertical",
+    "PersonaType",
+    "SPINStage",
+    "QualificationRating",
+    "TriggerType",
+    "CompetitorStatus",
+    # Nested Models
+    "PainPoint",
+    "ObjectionResponse",
+    "BuyingSignals",
+    "KeyDifferentiator",
+    "ClaimResponse",
+    "TalkTrack",
+    "ObjectionPivot",
+    "WarmInboundVariation",
+    "QualificationCriterion",
+    "MarketSize",
+    # Persona Warm Script Models
+    "PersonaObjectionResponse",
+    "PersonaWarmContext",
+    "PersonaTriggerVariation",
+    "PersonaWarmScript",
+    "WarmCallScript",
+    # Main Entity Models
+    "PersonaProfile",
+    "CompetitorBattlecard",
+    "ColdCallScript",
+    "WarmInboundScript",
+    "DiscoveryQuestion",
+    "EmailTemplate",
+    "LinkedInTemplate",
+    "ReferenceStory",
+    "CompetitorPricing",
+    "TechnologyTrend",
+    "MarketIntelligence",
+]
 
 
 # ============================================================================
@@ -150,7 +189,7 @@ class QualificationCriterion(BaseModel):
     category: str  # budget, authority, need, timeline, competition
     signal: str
     rating: QualificationRating
-    key_question: Optional[str] = None
+    key_question: str | None = None
 
 
 class MarketSize(BaseModel):
@@ -158,7 +197,7 @@ class MarketSize(BaseModel):
 
     year: int
     value_billions: float
-    source: Optional[str] = None
+    source: str | None = None
 
 
 # ============================================================================
@@ -229,6 +268,25 @@ class PersonaWarmScript(BaseModel):
     context_cues: PersonaWarmContext
 
 
+class WarmCallScript(BaseModel):
+    """Warm inbound call script result with ACQP framework.
+
+    This is the return type for get_warm_script_for_call(), providing
+    a structured response whether the script is persona-specific or
+    a generic trigger-based fallback.
+    """
+
+    acknowledge: str
+    connect: str
+    qualify: str
+    propose: str
+    discovery_questions: list[str] = Field(default_factory=list)
+    what_to_listen_for: list[str] = Field(default_factory=list)
+    source: str  # "persona_specific" or "trigger_generic"
+    persona_type: str | None = None
+    trigger_type: str
+
+
 # ============================================================================
 # Main Entity Models
 # ============================================================================
@@ -252,8 +310,7 @@ class PersonaProfile(BaseModel):
     objections: list[ObjectionResponse]
     buying_signals: BuyingSignals
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class CompetitorBattlecard(BaseModel):
@@ -273,11 +330,10 @@ class CompetitorBattlecard(BaseModel):
     claims: list[ClaimResponse]
     proof_points: list[str]
     talk_track: TalkTrack
-    call_mentions: Optional[int] = None
-    rank: Optional[int] = None
+    call_mentions: int | None = None
+    rank: int | None = None
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class ColdCallScript(BaseModel):
@@ -295,8 +351,7 @@ class ColdCallScript(BaseModel):
     why_it_works: list[str]
     objection_pivots: list[ObjectionPivot]
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class WarmInboundScript(BaseModel):
@@ -312,8 +367,7 @@ class WarmInboundScript(BaseModel):
     propose: str
     variations: list[WarmInboundVariation] = Field(default_factory=list)
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class DiscoveryQuestion(BaseModel):
@@ -325,8 +379,7 @@ class DiscoveryQuestion(BaseModel):
     question: str
     what_you_learn: str
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class EmailTemplate(BaseModel):
@@ -335,14 +388,13 @@ class EmailTemplate(BaseModel):
     id: str
     name: str
     trigger: str  # construction, equipment_failure, compliance, etc.
-    vertical: Optional[Vertical] = None
+    vertical: Vertical | None = None
     subject: str
     body: str
-    sequence_day: Optional[int] = None
+    sequence_day: int | None = None
     template_type: str = "cold"  # cold, warm, follow_up, breakup
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class LinkedInTemplate(BaseModel):
@@ -351,12 +403,11 @@ class LinkedInTemplate(BaseModel):
     id: str
     name: str
     trigger: str
-    vertical: Optional[Vertical] = None
+    vertical: Vertical | None = None
     message: str
     character_count: int = 0
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class ReferenceStory(BaseModel):
@@ -374,10 +425,9 @@ class ReferenceStory(BaseModel):
     solution: str
     results: list[str]
     talking_points: list[str]
-    case_study_url: Optional[str] = None
+    case_study_url: str | None = None
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class CompetitorPricing(BaseModel):

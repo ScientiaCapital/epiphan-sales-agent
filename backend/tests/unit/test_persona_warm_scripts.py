@@ -59,15 +59,17 @@ class TestPersonaWarmScriptsCompleteness:
                 )
 
     def test_total_script_count(self):
-        """Should have exactly 5 persona scripts (one per persona)."""
-        assert len(PERSONA_WARM_SCRIPTS) == 5
+        """Should have at least 5 persona scripts (one per priority persona)."""
+        # Currently 7 scripts: 5 priority + Law Firm IT + Technical Director
+        assert len(PERSONA_WARM_SCRIPTS) >= 5
 
     def test_total_trigger_variations(self):
-        """Should have exactly 20 trigger variations (5 personas × 4 triggers)."""
+        """Each persona should have 4 trigger variations."""
         total_variations = sum(
             len(script.trigger_variations) for script in PERSONA_WARM_SCRIPTS
         )
-        assert total_variations == 20
+        # Each persona has 4 triggers, so total = num_personas * 4
+        assert total_variations == len(PERSONA_WARM_SCRIPTS) * 4
 
 
 # ============================================================================
@@ -261,6 +263,46 @@ class TestCourtAdministratorWarmScript:
             stat in court_script.reference_story
             for stat in ["33", "1.78", "states"]
         )
+
+
+# ============================================================================
+# Corp Comms Director Script Tests
+# ============================================================================
+
+
+class TestCorpCommsDirectorWarmScript:
+    """Tests for Corp Comms Director (Corporate) warm scripts."""
+
+    @pytest.fixture
+    def corp_comms_script(self) -> PersonaWarmScript:
+        """Get the Corp Comms Director warm script."""
+        script = get_persona_warm_script(PersonaType.CORP_COMMS_DIRECTOR)
+        assert script is not None, "Corp Comms Director script not found"
+        return script
+
+    def test_corp_comms_primary_pain(self, corp_comms_script: PersonaWarmScript):
+        """Should mention 'CEO events' or 'zero tolerance for failures'."""
+        primary_pain_lower = corp_comms_script.primary_pain.lower()
+        assert any(
+            phrase in primary_pain_lower
+            for phrase in ["ceo", "zero tolerance", "failure"]
+        ), f"Expected 'ceo', 'zero tolerance', or 'failure' in primary_pain: {corp_comms_script.primary_pain}"
+
+    def test_corp_comms_reference_story(self, corp_comms_script: PersonaWarmScript):
+        """Should mention 'OpenAI' or 'Freeman'."""
+        reference_story = corp_comms_script.reference_story
+        assert any(
+            name in reference_story
+            for name in ["OpenAI", "Freeman"]
+        ), f"Expected 'OpenAI' or 'Freeman' in reference_story: {reference_story}"
+
+    def test_corp_comms_value_proposition(self, corp_comms_script: PersonaWarmScript):
+        """Should focus on broadcast quality without production team."""
+        value_prop_lower = corp_comms_script.value_proposition.lower()
+        assert any(
+            phrase in value_prop_lower
+            for phrase in ["broadcast", "production", "quality"]
+        ), f"Expected 'broadcast', 'production', or 'quality' in value_proposition: {corp_comms_script.value_proposition}"
 
 
 # ============================================================================

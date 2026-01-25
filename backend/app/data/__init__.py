@@ -9,23 +9,23 @@ Contains structured data extracted from the BDR Playbook:
 - Market Intelligence (trends, pricing, opportunities)
 """
 
+from app.data.competitors import COMPETITORS
+from app.data.discovery import DISCOVERY_QUESTIONS, QUALIFICATION_CRITERIA
+from app.data.market_intel import MARKET_INTELLIGENCE
+from app.data.personas import PERSONAS
 from app.data.schemas import (
-    PersonaProfile,
-    CompetitorBattlecard,
     ColdCallScript,
-    WarmInboundScript,
+    CompetitorBattlecard,
     DiscoveryQuestion,
     EmailTemplate,
-    ReferenceStory,
     MarketIntelligence,
+    PersonaProfile,
+    ReferenceStory,
+    WarmInboundScript,
 )
-from app.data.personas import PERSONAS
-from app.data.competitors import COMPETITORS
 from app.data.scripts import COLD_CALL_SCRIPTS, WARM_INBOUND_SCRIPTS
-from app.data.discovery import DISCOVERY_QUESTIONS, QUALIFICATION_CRITERIA
-from app.data.templates import EMAIL_TEMPLATES, LINKEDIN_TEMPLATES
 from app.data.stories import REFERENCE_STORIES
-from app.data.market_intel import MARKET_INTELLIGENCE
+from app.data.templates import EMAIL_TEMPLATES, LINKEDIN_TEMPLATES
 
 __all__ = [
     # Schemas

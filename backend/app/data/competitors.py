@@ -4,13 +4,23 @@
 """
 
 from app.data.schemas import (
-    CompetitorBattlecard,
-    KeyDifferentiator,
     ClaimResponse,
+    CompetitorBattlecard,
+    CompetitorStatus,
+    KeyDifferentiator,
     TalkTrack,
     Vertical,
-    CompetitorStatus,
 )
+
+__all__ = [
+    # Constants
+    "COMPETITORS",
+    # Functions
+    "get_competitor_by_id",
+    "get_active_competitors",
+    "get_displacement_opportunities",
+    "get_competitors_by_vertical",
+]
 
 COMPETITORS: list[CompetitorBattlecard] = [
     CompetitorBattlecard(

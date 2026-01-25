@@ -21,7 +21,7 @@ class TestGetWarmScriptForCall:
         )
         assert result is not None
         # Persona-specific scripts mention persona pain points
-        assert "room" in result["connect"].lower() or "AV" in result["connect"]
+        assert "room" in result.connect.lower() or "AV" in result.connect
 
     def test_returns_generic_script_when_persona_unknown(self):
         """Should fall back to generic trigger script when no persona."""
@@ -31,8 +31,8 @@ class TestGetWarmScriptForCall:
         )
         assert result is not None
         # Generic scripts have placeholder text like [common challenge]
-        assert result["acknowledge"] is not None
-        assert result["connect"] is not None
+        assert result.acknowledge is not None
+        assert result.connect is not None
 
     def test_returns_generic_script_for_unsupported_persona(self):
         """Should fall back when persona doesn't have warm scripts."""
@@ -62,10 +62,10 @@ class TestGetWarmScriptForCall:
             persona_type=PersonaType.LD_DIRECTOR,
         )
         assert result is not None
-        assert "acknowledge" in result
-        assert "connect" in result
-        assert "qualify" in result
-        assert "propose" in result
+        assert result.acknowledge is not None
+        assert result.connect is not None
+        assert result.qualify is not None
+        assert result.propose is not None
 
     def test_result_contains_discovery_questions_when_available(self):
         """Persona-specific results should include discovery questions."""
@@ -75,8 +75,8 @@ class TestGetWarmScriptForCall:
         )
         assert result is not None
         # Persona-specific scripts have discovery questions
-        assert "discovery_questions" in result
-        assert len(result["discovery_questions"]) > 0
+        assert result.discovery_questions is not None
+        assert len(result.discovery_questions) > 0
 
     def test_result_source_indicates_persona_specific(self):
         """Should indicate when result is persona-specific vs generic."""
@@ -85,14 +85,14 @@ class TestGetWarmScriptForCall:
             persona_type=PersonaType.COURT_ADMINISTRATOR,
         )
         assert persona_result is not None
-        assert persona_result.get("source") == "persona_specific"
+        assert persona_result.source == "persona_specific"
 
         generic_result = get_warm_script_for_call(
             trigger_type=TriggerType.REFERRAL,  # No persona-specific script
             persona_type=PersonaType.AV_DIRECTOR,
         )
         assert generic_result is not None
-        assert generic_result.get("source") == "trigger_generic"
+        assert generic_result.source == "trigger_generic"
 
     def test_all_priority_personas_have_four_triggers(self):
         """All 5 priority personas should have scripts for 4 main triggers."""
@@ -113,6 +113,6 @@ class TestGetWarmScriptForCall:
             for trigger in main_triggers:
                 result = get_warm_script_for_call(trigger, persona)
                 assert result is not None, f"Missing script for {persona.value} + {trigger.value}"
-                assert result.get("source") == "persona_specific", (
+                assert result.source == "persona_specific", (
                     f"{persona.value} + {trigger.value} should be persona_specific"
                 )

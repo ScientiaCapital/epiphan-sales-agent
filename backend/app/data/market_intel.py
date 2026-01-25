@@ -2,6 +2,17 @@
 
 from app.data.schemas import MarketIntelligence
 
+__all__ = [
+    # Constants
+    "MARKET_INTELLIGENCE",
+    "MARKET_SIZE_SUMMARY",
+    "COMPETITOR_THREAT_LEVELS",
+    "STRATEGIC_PRIORITIES",
+    # Functions
+    "get_intel_by_category",
+    "get_intel_by_id",
+]
+
 MARKET_INTELLIGENCE: list[MarketIntelligence] = [
     # ============================================================================
     # MARKET SIZE DATA

@@ -4,12 +4,20 @@
 """
 
 from app.data.schemas import (
-    PersonaProfile,
-    PainPoint,
-    ObjectionResponse,
     BuyingSignals,
+    ObjectionResponse,
+    PainPoint,
+    PersonaProfile,
     Vertical,
 )
+
+__all__ = [
+    # Constants
+    "PERSONAS",
+    # Functions
+    "get_persona_by_id",
+    "get_personas_by_vertical",
+]
 
 PERSONAS: list[PersonaProfile] = [
     PersonaProfile(

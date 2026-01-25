@@ -16,6 +16,22 @@ from app.data.schemas import (
     TriggerType,
 )
 
+__all__ = [
+    # Constants
+    "AV_DIRECTOR_WARM_SCRIPT",
+    "LD_DIRECTOR_WARM_SCRIPT",
+    "TECHNICAL_DIRECTOR_WARM_SCRIPT",
+    "SIMULATION_DIRECTOR_WARM_SCRIPT",
+    "COURT_ADMINISTRATOR_WARM_SCRIPT",
+    "LAW_FIRM_IT_WARM_SCRIPT",
+    "CORP_COMMS_DIRECTOR_WARM_SCRIPT",
+    "EHS_MANAGER_WARM_SCRIPT",
+    "PERSONA_WARM_SCRIPTS",
+    # Functions
+    "get_persona_warm_script",
+    "get_warm_script_for_persona_trigger",
+]
+
 # ============================================================================
 # AV Director (Higher Education)
 # Primary Pain: Too many rooms, too few people
@@ -683,6 +699,409 @@ COURT_ADMINISTRATOR_WARM_SCRIPT = PersonaWarmScript(
 
 
 # ============================================================================
+# Law Firm IT Director (Legal)
+# Primary Pain: Confidential case footage in cloud = discovery risk
+# Reference Story: Law firms choose Pearl for local recording, no cloud exposure
+# ============================================================================
+
+LAW_FIRM_IT_WARM_SCRIPT = PersonaWarmScript(
+    id="law_firm_it_warm",
+    persona_type=PersonaType.LAW_FIRM_IT,
+    persona_title="Law Firm IT Director",
+    primary_pain="Confidential case footage in cloud = discovery risk - sensitive deposition materials exposed to third-party subpoenas",
+    value_proposition="Local recording - confidential case materials never touch cloud, zero discovery exposure",
+    reference_story="Law firms choose Pearl because deposition footage stays on YOUR servers - no cloud = no discovery risk",
+    trigger_variations=[
+        # Content Download
+        PersonaTriggerVariation(
+            trigger_type=TriggerType.CONTENT_DOWNLOAD,
+            acknowledge="Hi [Name], this is Tim from Epiphan Video. Thanks for downloading our [content] - I noticed you're at [Firm Name]. Are you managing deposition technology there?",
+            connect="Most law firm IT directors who download that are dealing with a specific challenge - confidential case materials in cloud storage create discovery risk. Is that a concern for you?",
+            qualify="How are you capturing depositions today? Are recordings stored locally or in the cloud?",
+            propose="Law firms choose Pearl because deposition footage stays on your servers - no cloud means no discovery risk. Would a quick look at how that works be useful?",
+            discovery_questions=[
+                "How are you capturing depositions today?",
+                "Do you have multiple deposition rooms across offices?",
+                "Are you recording locally or using cloud storage?",
+                "How do you handle multi-angle capture for credibility assessment?",
+            ],
+            what_to_listen_for=[
+                "Cloud storage concerns for sensitive cases",
+                "Multi-office deposition room coordination",
+                "Chain of custody requirements",
+                "High-stakes litigation that requires video evidence",
+            ],
+        ),
+        # Webinar Attended
+        PersonaTriggerVariation(
+            trigger_type=TriggerType.WEBINAR_ATTENDED,
+            acknowledge="Hi [Name], this is Tim from Epiphan Video. Thanks for attending our [webinar title] - did the local recording approach address concerns you have about discovery exposure?",
+            connect="Law firm IT directors at that webinar are usually worried about the same thing - cloud-stored deposition footage becoming discoverable in opposing counsel's subpoenas. Sound familiar?",
+            qualify="What's your current deposition recording setup? Local storage or cloud-based?",
+            propose="I can show you how Pearl keeps all footage on your servers with chain of custody documentation. Would that help as you evaluate options?",
+            discovery_questions=[
+                "What specifically caught your interest about the webinar?",
+                "Have you had discovery concerns with cloud-stored footage?",
+                "What's your workflow from recording to attorney review?",
+            ],
+            what_to_listen_for=[
+                "Discovery exposure concerns",
+                "Interest in chain of custody",
+                "High-profile cases requiring video evidence",
+            ],
+        ),
+        # Demo Request (Highest Intent)
+        PersonaTriggerVariation(
+            trigger_type=TriggerType.DEMO_REQUEST,
+            acknowledge="Hi [Name], this is Tim from Epiphan Video. Got your demo request - let's get that scheduled.",
+            connect="What's driving the interest? Is this about keeping deposition footage off the cloud, or upgrading your multi-angle capture capability?",
+            qualify="Is this for a specific deposition room project, or evaluating options firm-wide? How many locations are we talking about?",
+            propose="I'll show you the local recording workflow and how chain of custody documentation works. What day works better this week?",
+            discovery_questions=[
+                "How many deposition rooms do you need to equip?",
+                "What's your timeline for deployment?",
+                "Who else needs to see this - managing partner, COO?",
+            ],
+            what_to_listen_for=[
+                "Specific project timeline",
+                "Budget already allocated",
+                "Decision-maker involvement",
+            ],
+        ),
+        # Pricing Page
+        PersonaTriggerVariation(
+            trigger_type=TriggerType.PRICING_PAGE,
+            acknowledge="Hi [Name], this is Tim from Epiphan Video. I noticed you were looking at our pricing.",
+            connect="Are you comparing us to cloud-based deposition services, or evaluating local recording for the first time?",
+            qualify="What's the scope - single deposition room or multiple offices? How many rooms need video capture?",
+            propose="Pearl is a one-time hardware cost with no subscription fees. Compare that to ongoing cloud service fees plus the discovery risk. Want me to walk you through the comparison?",
+            discovery_questions=[
+                "What's your current spend on deposition video services?",
+                "How many depositions do you record per year?",
+                "What's your timeline for making a decision?",
+            ],
+            what_to_listen_for=[
+                "Annual video service spend (ROI comparison)",
+                "Volume of depositions",
+                "Budget timing",
+            ],
+        ),
+    ],
+    objections=[
+        PersonaObjectionResponse(
+            objection="We use our deposition service provider's setup",
+            response="That's fine for transcript services. Pearl adds the multi-angle video backup for trial prep and credibility challenges - and it stays on your servers, not theirs.",
+            persona_context="Law firms often conflate deposition transcription with video recording - Pearl complements existing services.",
+        ),
+        PersonaObjectionResponse(
+            objection="Cloud recording is standard",
+            response="For confidential case materials? Cloud storage is discoverable by opposing counsel. Local recording keeps your case materials on your servers - zero cloud dependency, zero discovery exposure.",
+            persona_context="Law Firm IT Directors are keenly aware of discovery rules - cloud exposure is a real risk for sensitive cases.",
+        ),
+        PersonaObjectionResponse(
+            objection="Current setup works fine",
+            response="Until you need multi-angle video for credibility assessment or a high-stakes trial. Or until opposing counsel subpoenas your cloud provider. Pearl gives you both capability and protection.",
+            persona_context="Frame as risk mitigation for high-stakes litigation, not just feature upgrade.",
+        ),
+        PersonaObjectionResponse(
+            objection="Too expensive for backup video",
+            response="Multi-angle video credibility assessment is becoming standard in high-stakes litigation. And compare the cost of Pearl to the risk of discoverable cloud footage in a sensitive case.",
+            persona_context="Law Firm IT Directors understand risk/cost tradeoffs - discovery exposure can cost millions in litigation.",
+        ),
+    ],
+    context_cues=PersonaWarmContext(
+        what_to_listen_for=[
+            "Cloud storage concerns for sensitive cases",
+            "Discovery exposure worries",
+            "Chain of custody requirements",
+            "Multi-angle capture needs for credibility assessment",
+        ],
+        buying_signals=[
+            "We're building/upgrading deposition rooms",
+            "We need multi-angle video capability for trials",
+            "We had issues with video quality affecting trial prep",
+            "We're concerned about cloud storage for confidential cases",
+            "We have a high-profile case coming up",
+        ],
+        red_flags=[
+            "Just renewed contract with video deposition service",
+            "Managing partner not involved in tech decisions",
+            "Very small firm with minimal deposition volume",
+        ],
+    ),
+)
+
+
+# ============================================================================
+# Corp Comms Director (Corporate)
+# Primary Pain: Zero tolerance for failures during CEO events
+# Reference Story: OpenAI "workhorse of streams" + Freeman uses Pearl
+# ============================================================================
+
+CORP_COMMS_DIRECTOR_WARM_SCRIPT = PersonaWarmScript(
+    id="corp_comms_director_warm",
+    persona_type=PersonaType.CORP_COMMS_DIRECTOR,
+    persona_title="Corp Comms Director",
+    primary_pain="Zero tolerance for failures during CEO events - technical failures during executive communications are career-ending",
+    value_proposition="Broadcast quality without production team - professional-grade reliability for executive communications",
+    reference_story="OpenAI calls Pearl 'the workhorse of our streams' + Freeman (major event producer) uses Pearl for reliability",
+    trigger_variations=[
+        # Content Download
+        PersonaTriggerVariation(
+            trigger_type=TriggerType.CONTENT_DOWNLOAD,
+            acknowledge="Hi [Name], this is Tim from Epiphan Video. Thanks for downloading our [content] - I noticed you're in corporate communications at [Company].",
+            connect="Most corp comms leaders who download that are dealing with the same challenge - zero tolerance for failures during the CEO's quarterly address. Is reliability something you're thinking about?",
+            qualify="How are you handling executive town halls and internal broadcasts today? In-house production team or external?",
+            propose="OpenAI calls Pearl 'the workhorse of their streams' - broadcast quality without a production crew. Would a quick look at how they do executive communications be useful?",
+            discovery_questions=[
+                "How are you currently handling executive town halls and quarterly addresses?",
+                "What's your current setup for the CEO's internal communications?",
+                "Have you had any technical failures during important executive broadcasts?",
+                "Who manages the production - internal team or outsourced?",
+            ],
+            what_to_listen_for=[
+                "Past failures during executive events (high pain indicator)",
+                "External production costs being too high",
+                "Quality concerns with Zoom/Teams",
+                "Building or renovating broadcast spaces",
+            ],
+        ),
+        # Webinar Attended
+        PersonaTriggerVariation(
+            trigger_type=TriggerType.WEBINAR_ATTENDED,
+            acknowledge="Hi [Name], this is Tim from Epiphan Video. Thanks for attending our [webinar title] - did the reliability discussion resonate with your executive communications challenges?",
+            connect="Corp comms leaders at that webinar usually have one thing in common - they can't afford technical failures during the CEO's address. Has that happened to you?",
+            qualify="What's your current setup for executive broadcasts? Are you relying on Zoom/Teams or something more robust?",
+            propose="Freeman, one of the largest event producers, uses Pearl for reliability. I can show you how companies eliminate production overhead while getting broadcast quality. Would that help?",
+            discovery_questions=[
+                "What specifically caught your interest about the webinar?",
+                "How do you handle quality when streaming to remote workers?",
+                "Are you planning to scale your town hall program for hybrid workforce?",
+            ],
+            what_to_listen_for=[
+                "Interest in eliminating production team dependency",
+                "Hybrid workforce challenges",
+                "Questions about quality vs. Zoom/Teams",
+            ],
+        ),
+        # Demo Request (Highest Intent)
+        PersonaTriggerVariation(
+            trigger_type=TriggerType.DEMO_REQUEST,
+            acknowledge="Hi [Name], this is Tim from Epiphan Video. Got your demo request - let's get that scheduled while it's fresh.",
+            connect="What's driving the interest? Is this about reliability for executive communications, or reducing production overhead?",
+            qualify="Is this for a specific broadcast studio project, or building a case for bringing production in-house? What's your timeline?",
+            propose="Perfect - I'll show you how companies like OpenAI get broadcast quality without production overhead. What works better, early or later this week?",
+            discovery_questions=[
+                "How many office locations are part of your internal broadcast strategy?",
+                "What's driving the timeline?",
+                "Who else needs to see this to move forward?",
+            ],
+            what_to_listen_for=[
+                "Specific executive communication initiative with deadline",
+                "Budget already allocated for AV/comms technology",
+                "Decision-maker involvement (CEO office interested)",
+            ],
+        ),
+        # Pricing Page
+        PersonaTriggerVariation(
+            trigger_type=TriggerType.PRICING_PAGE,
+            acknowledge="Hi [Name], this is Tim from Epiphan Video. I noticed you were checking out our pricing.",
+            connect="Are you comparing us to external production costs, or evaluating bringing broadcast capability in-house?",
+            qualify="What's the scope - single broadcast studio or multiple office locations? Are you looking to standardize quality across locations?",
+            propose="Most corp comms teams see ROI in the first year compared to external production. I can walk you through how companies like Freeman and OpenAI use Pearl. Would that be helpful?",
+            discovery_questions=[
+                "What are you spending annually on external production?",
+                "How many executive broadcasts do you do per year?",
+                "What's your timeline for making a decision?",
+            ],
+            what_to_listen_for=[
+                "Annual production spend (ROI comparison)",
+                "Volume of executive communications",
+                "Budget timing and decision process",
+            ],
+        ),
+    ],
+    objections=[
+        PersonaObjectionResponse(
+            objection="We use Zoom/Teams",
+            response="Zoom caps at 720p and any mobile participant degrades the entire broadcast. For the CEO's quarterly address, you need broadcast quality - it reflects the company's brand.",
+            persona_context="Corp Comms Directors care about executive presence and brand consistency - Zoom quality undermines both.",
+        ),
+        PersonaObjectionResponse(
+            objection="External production company handles this",
+            response="Pearl lets you bring that in-house. One device, no production overhead, same broadcast quality. The CEO doesn't need a film crew for every town hall.",
+            persona_context="Corp Comms Directors are measured on cost efficiency - external production is a recurring expense they can eliminate.",
+        ),
+        PersonaObjectionResponse(
+            objection="Our current system works",
+            response="Until it doesn't - during the CEO's quarterly address. What's the cost of that failure? Pearl is insurance against the one failure that can't happen.",
+            persona_context="Frame as risk mitigation - Corp Comms Directors have zero tolerance for executive communication failures.",
+        ),
+        PersonaObjectionResponse(
+            objection="This is overkill for internal comms",
+            response="Your internal communications shape employee engagement and retention. When the CEO speaks, it deserves broadcast quality - it reflects leadership's commitment to the workforce.",
+            persona_context="Connect production quality to employee engagement metrics they're measured on.",
+        ),
+    ],
+    context_cues=PersonaWarmContext(
+        what_to_listen_for=[
+            "Past failures during executive events",
+            "External production costs and frustrations",
+            "Zoom/Teams quality complaints",
+            "Hybrid workforce communication challenges",
+        ],
+        buying_signals=[
+            "We had a technical failure during [executive event]",
+            "We're scaling our town hall program for hybrid workforce",
+            "We're building a new broadcast studio",
+            "External production costs are too high",
+            "The CEO wants better quality for quarterly addresses",
+        ],
+        red_flags=[
+            "IT controls all AV decisions (no budget authority)",
+            "Just renewed external production contract",
+            "Very small company (CEO doesn't do formal broadcasts)",
+        ],
+    ),
+)
+
+
+# ============================================================================
+# EHS Manager (Industrial/Manufacturing)
+# Primary Pain: OSHA compliance documentation gaps
+# Reference Story: One OSHA violation can cost $100K-$500K+
+# ============================================================================
+
+EHS_MANAGER_WARM_SCRIPT = PersonaWarmScript(
+    id="ehs_manager_warm",
+    persona_type=PersonaType.EHS_MANAGER,
+    persona_title="EHS Manager",
+    primary_pain="Proving training was actually delivered - OSHA compliance documentation gaps leave you vulnerable during audits",
+    value_proposition="Video proof of safety training delivery for OSHA compliance - documented evidence that protects you during audits",
+    reference_story="One OSHA violation can cost $100K-$500K+ - video documentation of safety training is insurance against citations",
+    trigger_variations=[
+        # Content Download
+        PersonaTriggerVariation(
+            trigger_type=TriggerType.CONTENT_DOWNLOAD,
+            acknowledge="Hi [Name], this is Tim from Epiphan Video. Thanks for downloading our [content] - I noticed you're in EHS at [Company]. Are you managing safety compliance there?",
+            connect="Most EHS managers who download that are dealing with the same challenge - proving training was actually delivered when OSHA comes knocking. Is documentation a pain point for you?",
+            qualify="How are you documenting safety training completion today? Paper sign-offs, or something more robust?",
+            propose="Manufacturers use Pearl to create video proof of safety training delivery - audit-ready documentation that holds up to OSHA scrutiny. Would a quick look at how that works be useful?",
+            discovery_questions=[
+                "How do you currently document safety training compliance?",
+                "Have you had OSHA violations related to documentation gaps?",
+                "When an incident occurs, how do you document and investigate it?",
+                "How often do you face OSHA audits or inspections?",
+            ],
+            what_to_listen_for=[
+                "Recent OSHA violations or citations",
+                "Upcoming audit or inspection",
+                "Incident investigation challenges",
+                "Documentation gaps across shifts",
+            ],
+        ),
+        # Webinar Attended
+        PersonaTriggerVariation(
+            trigger_type=TriggerType.WEBINAR_ATTENDED,
+            acknowledge="Hi [Name], this is Tim from Epiphan Video. Thanks for attending our [webinar title] - did the compliance documentation approach resonate with your challenges?",
+            connect="EHS managers at that webinar are usually worried about the same thing - being able to prove training was delivered if OSHA shows up. How's your documentation situation?",
+            qualify="Are you relying on paper sign-offs today, or do you have video documentation of training delivery?",
+            propose="I can show you how manufacturers create audit-ready video proof of safety training. Would that help as you think about compliance?",
+            discovery_questions=[
+                "What specifically caught your interest about the webinar?",
+                "How confident are you in your training documentation if audited tomorrow?",
+                "What's your biggest compliance worry right now?",
+            ],
+            what_to_listen_for=[
+                "Audit anxiety or upcoming inspections",
+                "Recent incidents or near-misses",
+                "Documentation process frustrations",
+            ],
+        ),
+        # Demo Request (Highest Intent)
+        PersonaTriggerVariation(
+            trigger_type=TriggerType.DEMO_REQUEST,
+            acknowledge="Hi [Name], this is Tim from Epiphan Video. Got your demo request - let's get that scheduled.",
+            connect="What's driving the interest? Is this about documenting safety training for OSHA compliance, or incident investigation?",
+            qualify="Is this for a specific compliance initiative, or are you building the case for better documentation? What's your timeline?",
+            propose="I'll show you how manufacturers create video proof of safety training that stands up to OSHA audits. What day works better this week?",
+            discovery_questions=[
+                "How many training sessions do you need to document?",
+                "What's your timeline for improving documentation?",
+                "Who else needs to see this - VP of Operations, Plant Manager?",
+            ],
+            what_to_listen_for=[
+                "Specific compliance deadlines",
+                "Budget already allocated for safety tech",
+                "Decision-maker involvement",
+            ],
+        ),
+        # Pricing Page
+        PersonaTriggerVariation(
+            trigger_type=TriggerType.PRICING_PAGE,
+            acknowledge="Hi [Name], this is Tim from Epiphan Video. I noticed you were looking at our pricing.",
+            connect="Are you comparing us to other documentation solutions, or evaluating video capture for the first time?",
+            qualify="What's the scope - single training room or multiple facilities? How many locations need documentation capability?",
+            propose="Compare the cost of Pearl to one OSHA violation - $100K to $500K+. Video documentation pays for itself the first time it prevents a citation. Want me to walk you through the ROI?",
+            discovery_questions=[
+                "What's your current budget for safety documentation?",
+                "How many facilities need this capability?",
+                "What's your timeline for making a decision?",
+            ],
+            what_to_listen_for=[
+                "Budget range and approval process",
+                "Multi-facility deployment scope",
+                "Urgency driven by recent incidents",
+            ],
+        ),
+    ],
+    objections=[
+        PersonaObjectionResponse(
+            objection="We use incident reporting software",
+            response="That captures the report. Pearl captures the evidence - video proof of training delivery and incident documentation. They're complementary - reports without evidence leave gaps OSHA can exploit.",
+            persona_context="EHS Managers often conflate incident reporting with evidence capture - clarify that Pearl adds the proof layer.",
+        ),
+        PersonaObjectionResponse(
+            objection="Video is too complex for plant floor",
+            response="Pearl is designed for simplicity - plant supervisors can operate it without tech training. One-button recording, automatic upload. If they can use a tablet, they can use Pearl.",
+            persona_context="EHS Managers worry about adoption by plant floor staff - emphasize simplicity and minimal training needed.",
+        ),
+        PersonaObjectionResponse(
+            objection="Our incidents are rare",
+            response="That's exactly why you need documentation ready. OSHA doesn't care that incidents are rare - when they happen, you need the evidence. And for training documentation, frequency doesn't matter - proof does.",
+            persona_context="Rare incidents = rare documentation practice. Frame as insurance, not frequent-use tool.",
+        ),
+        PersonaObjectionResponse(
+            objection="Too expensive for safety budget",
+            response="What's the cost of one OSHA violation? $100K to $500K+ for serious violations. Or one incident investigation that goes wrong due to lack of evidence? Pearl pays for itself.",
+            persona_context="EHS Managers understand risk/cost tradeoffs - frame as insurance against violations, not technology expense.",
+        ),
+    ],
+    context_cues=PersonaWarmContext(
+        what_to_listen_for=[
+            "Recent OSHA violations or citations",
+            "Upcoming audit or inspection dates",
+            "Incident investigation challenges",
+            "Training documentation process pain",
+            "Multi-shift consistency concerns",
+        ],
+        buying_signals=[
+            "We had an OSHA violation or citation recently",
+            "We're preparing for an OSHA audit",
+            "We had a serious incident that needs better documentation",
+            "Leadership is asking us to improve our documentation",
+            "We can't prove training was delivered consistently",
+        ],
+        red_flags=[
+            "Safety reports to L&D, not Operations (budget may be elsewhere)",
+            "Very small facility with minimal OSHA exposure",
+            "Just hired - may not have budget authority yet",
+        ],
+    ),
+)
+
+
+# ============================================================================
 # Combined Collection
 # ============================================================================
 
@@ -692,6 +1111,9 @@ PERSONA_WARM_SCRIPTS: list[PersonaWarmScript] = [
     TECHNICAL_DIRECTOR_WARM_SCRIPT,
     SIMULATION_DIRECTOR_WARM_SCRIPT,
     COURT_ADMINISTRATOR_WARM_SCRIPT,
+    LAW_FIRM_IT_WARM_SCRIPT,
+    CORP_COMMS_DIRECTOR_WARM_SCRIPT,
+    EHS_MANAGER_WARM_SCRIPT,
 ]
 
 
