@@ -2,11 +2,12 @@
 
 from app.data.schemas import (
     ColdCallScript,
-    WarmInboundScript,
     ObjectionPivot,
-    WarmInboundVariation,
-    Vertical,
+    PersonaType,
     TriggerType,
+    Vertical,
+    WarmInboundScript,
+    WarmInboundVariation,
 )
 
 COLD_CALL_SCRIPTS: list[ColdCallScript] = [
@@ -472,4 +473,66 @@ def get_warm_script_by_trigger(trigger: TriggerType) -> WarmInboundScript | None
     for script in WARM_INBOUND_SCRIPTS:
         if script.trigger_type == trigger:
             return script
+    return None
+
+
+def get_warm_script_for_call(
+    trigger_type: TriggerType,
+    persona_type: PersonaType | None = None,
+) -> dict | None:
+    """Get the best warm script for a call based on persona and trigger.
+
+    This is the primary integration point for warm inbound calls. It:
+    1. First tries to find a persona-specific script (persona + trigger)
+    2. Falls back to a generic trigger-based script if no persona match
+
+    Args:
+        trigger_type: What action the lead took (content download, demo request, etc.)
+        persona_type: Who the lead is (AV Director, L&D Director, etc.), or None if unknown
+
+    Returns:
+        Dictionary with ACQP fields (acknowledge, connect, qualify, propose) and metadata,
+        or None if no script available for this trigger.
+
+    Example:
+        >>> script = get_warm_script_for_call(
+        ...     trigger_type=TriggerType.CONTENT_DOWNLOAD,
+        ...     persona_type=PersonaType.AV_DIRECTOR
+        ... )
+        >>> print(script["acknowledge"])
+        "Hi [Name], this is Tim from Epiphan Video..."
+    """
+    from app.data.persona_warm_scripts import get_warm_script_for_persona_trigger
+
+    # Try persona-specific script first
+    if persona_type is not None:
+        persona_variation = get_warm_script_for_persona_trigger(persona_type, trigger_type)
+        if persona_variation is not None:
+            return {
+                "acknowledge": persona_variation.acknowledge,
+                "connect": persona_variation.connect,
+                "qualify": persona_variation.qualify,
+                "propose": persona_variation.propose,
+                "discovery_questions": persona_variation.discovery_questions,
+                "what_to_listen_for": persona_variation.what_to_listen_for,
+                "source": "persona_specific",
+                "persona_type": persona_type.value,
+                "trigger_type": trigger_type.value,
+            }
+
+    # Fall back to generic trigger-based script
+    generic_script = get_warm_script_by_trigger(trigger_type)
+    if generic_script is not None:
+        return {
+            "acknowledge": generic_script.acknowledge,
+            "connect": generic_script.connect,
+            "qualify": generic_script.qualify,
+            "propose": generic_script.propose,
+            "discovery_questions": [],  # Generic scripts don't have these
+            "what_to_listen_for": [],
+            "source": "trigger_generic",
+            "persona_type": persona_type.value if persona_type else None,
+            "trigger_type": trigger_type.value,
+        }
+
     return None

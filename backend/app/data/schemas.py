@@ -162,6 +162,74 @@ class MarketSize(BaseModel):
 
 
 # ============================================================================
+# Persona Warm Script Models (Persona + Trigger Matrix)
+# ============================================================================
+
+
+class PersonaObjectionResponse(BaseModel):
+    """Persona-specific objection handling with optional context.
+
+    Unlike generic ObjectionResponse, this includes persona-specific
+    context to help the BDR tailor the response to the persona's worldview.
+    """
+
+    objection: str
+    response: str
+    persona_context: str | None = None
+
+
+class PersonaWarmContext(BaseModel):
+    """Context cues for persona-specific warm calls.
+
+    Helps BDRs recognize buying signals, red flags, and key
+    information to listen for during the call.
+    """
+
+    what_to_listen_for: list[str] = Field(default_factory=list)
+    buying_signals: list[str] = Field(default_factory=list)
+    red_flags: list[str] = Field(default_factory=list)
+
+
+class PersonaTriggerVariation(BaseModel):
+    """Trigger-specific script variation for a persona.
+
+    Uses the ACQP framework (Acknowledge, Connect, Qualify, Propose)
+    tailored to both the persona's pain points AND the trigger action.
+    """
+
+    trigger_type: TriggerType
+    acknowledge: str  # Reference action + persona context
+    connect: str  # Bridge to persona-specific pain
+    qualify: str  # Persona-specific qualification
+    propose: str  # Tailored next step with reference story
+    discovery_questions: list[str] = Field(default_factory=list)
+    what_to_listen_for: list[str] = Field(default_factory=list)
+
+
+class PersonaWarmScript(BaseModel):
+    """Complete persona-specific warm lead script.
+
+    Combines persona pain points with trigger context for highly
+    targeted warm inbound calls. Each persona has multiple trigger
+    variations covering the 4 main inbound actions:
+    - Content Download
+    - Webinar Attended
+    - Demo Request
+    - Pricing Page
+    """
+
+    id: str
+    persona_type: PersonaType
+    persona_title: str
+    primary_pain: str  # The #1 pain point for this persona
+    value_proposition: str  # How Pearl solves their primary pain
+    reference_story: str  # e.g., "NC State: 300+ rooms, team of 3"
+    trigger_variations: list[PersonaTriggerVariation]
+    objections: list[PersonaObjectionResponse] = Field(default_factory=list)
+    context_cues: PersonaWarmContext
+
+
+# ============================================================================
 # Main Entity Models
 # ============================================================================
 
