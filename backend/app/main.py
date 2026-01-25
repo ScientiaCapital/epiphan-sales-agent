@@ -9,7 +9,7 @@ from app.core.config import settings
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     """Application lifecycle management."""
     # Startup
     print(f"Starting {settings.app_name} v{settings.version}")

@@ -337,8 +337,8 @@ class TestRowLevelSecurity:
 
     def test_rls_restricts_access(
         self,
-        supabase_client: Client,
-        supabase_admin_client: Client,
+        _supabase_client: Client,
+        _supabase_admin_client: Client,
     ) -> None:
         """
         Test that RLS restricts access appropriately.

@@ -26,7 +26,7 @@ from httpx import AsyncClient
 def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
     """
     Create an event loop for the test session.
-    
+
     scope="session" means ONE loop for ALL tests - faster but be careful
     about test isolation. Use scope="function" if tests need isolation.
     """
@@ -39,7 +39,7 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 async def mock_db() -> AsyncGenerator[MagicMock, None]:
     """
     Mock database connection for unit tests.
-    
+
     Use this when you want to test logic WITHOUT hitting a real database.
     For integration tests, use a real test database instead.
     """
@@ -55,10 +55,10 @@ async def mock_db() -> AsyncGenerator[MagicMock, None]:
 async def test_db_connection() -> AsyncGenerator[Any, None]:
     """
     Real database connection for integration tests.
-    
+
     Uses a separate test database that gets cleaned up after each test.
     Configure via TEST_DATABASE_URL environment variable.
-    
+
     Example:
         async def test_create_lead(test_db_connection):
             result = await create_lead(test_db_connection, lead_data)
@@ -84,15 +84,15 @@ async def test_db_connection() -> AsyncGenerator[Any, None]:
 async def async_client() -> AsyncGenerator[AsyncClient, None]:
     """
     Async HTTP client for testing FastAPI endpoints.
-    
+
     Example usage with FastAPI:
         from your_app.main import app
-        
+
         @pytest.fixture
         async def client() -> AsyncGenerator[AsyncClient, None]:
             async with AsyncClient(app=app, base_url="http://test") as client:
                 yield client
-        
+
         async def test_health_check(client):
             response = await client.get("/health")
             assert response.status_code == 200
@@ -109,7 +109,7 @@ async def async_client() -> AsyncGenerator[AsyncClient, None]:
 def sample_lead() -> dict[str, Any]:
     """
     Sample lead data for testing.
-    
+
     Use fixtures for test data instead of hardcoding in tests.
     This makes tests more readable and data easier to maintain.
     """
@@ -129,7 +129,7 @@ def sample_lead() -> dict[str, Any]:
 def sample_leads(sample_lead: dict[str, Any]) -> list[dict[str, Any]]:
     """
     Multiple sample leads for batch testing.
-    
+
     Notice how this fixture DEPENDS on sample_lead fixture.
     Pytest handles the dependency injection automatically.
     """
@@ -148,12 +148,12 @@ def sample_leads(sample_lead: dict[str, Any]) -> list[dict[str, Any]]:
 def mock_llm_client() -> MagicMock:
     """
     Mock LLM client to avoid API calls during testing.
-    
+
     Real LLM calls are:
     - Slow (adds seconds to every test)
     - Expensive (costs money per call)
     - Non-deterministic (responses vary)
-    
+
     Always mock LLM calls in unit tests.
     """
     client = MagicMock()
@@ -171,7 +171,7 @@ def mock_llm_client() -> MagicMock:
 def mock_enrichment_api() -> MagicMock:
     """
     Mock external enrichment API (e.g., Clearbit, Apollo).
-    
+
     External APIs should ALWAYS be mocked in tests because:
     - They might be down
     - They have rate limits
@@ -199,7 +199,7 @@ def mock_enrichment_api() -> MagicMock:
 def setup_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     Set up test environment variables.
-    
+
     autouse=True means this runs for EVERY test automatically.
     Use monkeypatch to set env vars - they reset after each test.
     """
@@ -216,7 +216,7 @@ def setup_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 def temp_file(tmp_path) -> Generator[Any, None, None]:
     """
     Create a temporary file that's automatically cleaned up.
-    
+
     tmp_path is a built-in pytest fixture that provides a temp directory
     unique to each test invocation.
     """
