@@ -305,6 +305,76 @@ class TestCorpCommsDirectorWarmScript:
         ), f"Expected 'broadcast', 'production', or 'quality' in value_proposition: {corp_comms_script.value_proposition}"
 
 
+class TestEHSManagerWarmScript:
+    """Tests for EHS Manager (Industrial) warm scripts."""
+
+    @pytest.fixture
+    def ehs_script(self) -> PersonaWarmScript:
+        """Get the EHS Manager warm script."""
+        script = get_persona_warm_script(PersonaType.EHS_MANAGER)
+        assert script is not None, "EHS Manager script not found"
+        return script
+
+    def test_ehs_manager_primary_pain(self, ehs_script: PersonaWarmScript):
+        """Should mention 'OSHA', 'compliance', or 'documentation'."""
+        primary_pain_lower = ehs_script.primary_pain.lower()
+        assert any(
+            phrase in primary_pain_lower
+            for phrase in ["osha", "compliance", "documentation", "training"]
+        ), f"Expected 'osha', 'compliance', 'documentation', or 'training' in primary_pain: {ehs_script.primary_pain}"
+
+    def test_ehs_manager_reference_story(self, ehs_script: PersonaWarmScript):
+        """Should mention OSHA violation costs."""
+        reference_story = ehs_script.reference_story
+        assert any(
+            amount in reference_story
+            for amount in ["$100K", "$500K", "OSHA", "violation"]
+        ), f"Expected '$100K', '$500K', 'OSHA', or 'violation' in reference_story: {reference_story}"
+
+    def test_ehs_manager_value_proposition(self, ehs_script: PersonaWarmScript):
+        """Should focus on video proof or compliance documentation."""
+        value_prop_lower = ehs_script.value_proposition.lower()
+        assert any(
+            phrase in value_prop_lower
+            for phrase in ["proof", "compliance", "documentation", "osha"]
+        ), f"Expected 'proof', 'compliance', 'documentation', or 'osha' in value_proposition: {ehs_script.value_proposition}"
+
+
+class TestLawFirmITWarmScript:
+    """Tests for Law Firm IT Director (Legal) warm scripts."""
+
+    @pytest.fixture
+    def law_firm_script(self) -> PersonaWarmScript:
+        """Get the Law Firm IT warm script."""
+        script = get_persona_warm_script(PersonaType.LAW_FIRM_IT)
+        assert script is not None, "Law Firm IT script not found"
+        return script
+
+    def test_law_firm_it_primary_pain(self, law_firm_script: PersonaWarmScript):
+        """Should mention 'confidential', 'discovery', or 'cloud risk'."""
+        primary_pain_lower = law_firm_script.primary_pain.lower()
+        assert any(
+            phrase in primary_pain_lower
+            for phrase in ["confidential", "discovery", "cloud", "risk"]
+        ), f"Expected 'confidential', 'discovery', 'cloud', or 'risk' in primary_pain: {law_firm_script.primary_pain}"
+
+    def test_law_firm_it_reference_story(self, law_firm_script: PersonaWarmScript):
+        """Should mention local recording or server storage."""
+        reference_story_lower = law_firm_script.reference_story.lower()
+        assert any(
+            phrase in reference_story_lower
+            for phrase in ["local", "server", "cloud", "discovery"]
+        ), f"Expected 'local', 'server', 'cloud', or 'discovery' in reference_story: {law_firm_script.reference_story}"
+
+    def test_law_firm_it_value_proposition(self, law_firm_script: PersonaWarmScript):
+        """Should focus on local recording or eliminating cloud exposure."""
+        value_prop_lower = law_firm_script.value_proposition.lower()
+        assert any(
+            phrase in value_prop_lower
+            for phrase in ["local", "cloud", "deposition", "server"]
+        ), f"Expected 'local', 'cloud', 'deposition', or 'server' in value_proposition: {law_firm_script.value_proposition}"
+
+
 # ============================================================================
 # Helper Function Tests
 # ============================================================================
@@ -319,11 +389,22 @@ class TestHelperFunctions:
         assert script is not None
         assert script.persona_type == PersonaType.AV_DIRECTOR
 
-    def test_get_persona_warm_script_not_found(self):
-        """Should return None for persona without warm script."""
-        # EHS_MANAGER is not in our 5 priority personas
-        script = get_persona_warm_script(PersonaType.EHS_MANAGER)
-        assert script is None
+    def test_all_personas_have_warm_scripts(self):
+        """All 8 personas should now have warm scripts."""
+        # All 8 personas are now implemented
+        all_personas = [
+            PersonaType.AV_DIRECTOR,
+            PersonaType.LD_DIRECTOR,
+            PersonaType.TECHNICAL_DIRECTOR,
+            PersonaType.SIMULATION_DIRECTOR,
+            PersonaType.COURT_ADMINISTRATOR,
+            PersonaType.CORP_COMMS_DIRECTOR,
+            PersonaType.EHS_MANAGER,
+            PersonaType.LAW_FIRM_IT,
+        ]
+        for persona in all_personas:
+            script = get_persona_warm_script(persona)
+            assert script is not None, f"{persona.value} should have a warm script"
 
     def test_get_warm_script_for_persona_trigger_found(self):
         """Should return trigger variation for valid combo."""
@@ -335,10 +416,10 @@ class TestHelperFunctions:
         assert variation.trigger_type == TriggerType.CONTENT_DOWNLOAD
 
     def test_get_warm_script_for_persona_trigger_not_found(self):
-        """Should return None for invalid persona/trigger combo."""
-        # EHS_MANAGER doesn't have warm scripts
+        """Should return None for trigger type without warm scripts."""
+        # TRADE_SHOW trigger doesn't have persona-specific warm scripts
         variation = get_warm_script_for_persona_trigger(
-            PersonaType.EHS_MANAGER,
-            TriggerType.CONTENT_DOWNLOAD
+            PersonaType.AV_DIRECTOR,
+            TriggerType.TRADE_SHOW
         )
         assert variation is None
