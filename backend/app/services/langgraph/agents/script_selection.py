@@ -6,8 +6,6 @@ Uses Claude for high-quality personalization.
 
 from typing import Any
 
-from langgraph.graph import END, StateGraph
-
 from app.data.lead_schemas import Lead
 from app.services.langgraph.states import ScriptSelectionState
 from app.services.langgraph.tools.script_tools import (
@@ -16,6 +14,7 @@ from app.services.langgraph.tools.script_tools import (
     get_warm_script,
 )
 from app.services.llm.clients import llm_router
+from langgraph.graph import END, StateGraph
 
 
 class ScriptSelectionAgent:

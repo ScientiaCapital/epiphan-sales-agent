@@ -6,8 +6,8 @@ cold scripts (by vertical), and persona profiles.
 
 from typing import Any
 
-from app.data.personas import get_persona_by_id
 from app.data.persona_warm_scripts import get_warm_script_for_persona_trigger
+from app.data.personas import get_persona_by_id
 from app.data.schemas import PersonaType, TriggerType, Vertical
 from app.data.scripts import get_script_by_vertical
 

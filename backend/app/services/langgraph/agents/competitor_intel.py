@@ -6,14 +6,13 @@ Uses fast LLM (Cerebras/DeepSeek) for <2s response time.
 
 from typing import Any
 
-from langgraph.graph import END, StateGraph
-
 from app.services.langgraph.states import CompetitorIntelState
 from app.services.langgraph.tools.competitor_tools import (
     get_battlecard,
     get_claim_responses,
 )
 from app.services.llm.clients import llm_router
+from langgraph.graph import END, StateGraph
 
 
 class CompetitorIntelAgent:

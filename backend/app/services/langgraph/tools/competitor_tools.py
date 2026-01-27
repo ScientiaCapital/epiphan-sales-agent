@@ -97,9 +97,8 @@ def get_claim_responses(
 
     responses = []
     for claim in competitor.claims:
-        if keyword:
-            if keyword.lower() not in claim.claim.lower():
-                continue
+        if keyword and keyword.lower() not in claim.claim.lower():
+            continue
         responses.append(
             {
                 "claim": claim.claim,
