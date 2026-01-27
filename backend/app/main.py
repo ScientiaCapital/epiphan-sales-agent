@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.scripts import router as scripts_router
 from app.core.config import settings
 
 
@@ -54,9 +55,5 @@ async def health():
     return {"status": "healthy"}
 
 
-# Import and include routers
-# from app.api.routes import leads, hubspot, clari, agents
-# app.include_router(leads.router, prefix="/api/leads", tags=["leads"])
-# app.include_router(hubspot.router, prefix="/api/hubspot", tags=["hubspot"])
-# app.include_router(clari.router, prefix="/api/clari", tags=["clari"])
-# app.include_router(agents.router, prefix="/api/agents", tags=["agents"])
+# Include routers
+app.include_router(scripts_router, prefix="/api/scripts", tags=["scripts"])
