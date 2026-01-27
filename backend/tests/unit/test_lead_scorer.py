@@ -206,7 +206,7 @@ class TestLeadScorer:
 
     def test_engagement_score_recently_contacted(self, scorer):
         """Test engagement score for recently contacted lead."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
 
         lead = Lead(
             hubspot_id="123",

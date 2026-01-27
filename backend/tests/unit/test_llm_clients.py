@@ -1,8 +1,6 @@
 """Tests for LLM client routing."""
 
-from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 class TestLLMRouter:
@@ -78,7 +76,7 @@ class TestLLMRouter:
         from app.services.llm.clients import LLMRouter
 
         expected = {"personalization", "synthesis", "generation", "research"}
-        assert LLMRouter.QUALITY_TASKS == expected
+        assert expected == LLMRouter.QUALITY_TASKS
 
     def test_get_model_unknown_task_uses_cerebras(self):
         """Test that unknown task types default to Cerebras (fast)."""

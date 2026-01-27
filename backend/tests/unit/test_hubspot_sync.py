@@ -229,7 +229,7 @@ class TestFullSync:
 
     @pytest.mark.asyncio
     async def test_full_sync_handles_hubspot_error(
-        self, mock_hubspot_client, mock_supabase_client
+        self, mock_hubspot_client, mock_supabase_client  # noqa: ARG002
     ):
         """Test handling of HubSpot API errors."""
         mock_hubspot_client.get_all_contacts = AsyncMock(
@@ -268,7 +268,7 @@ class TestIncrementalSync:
 
     @pytest.mark.asyncio
     async def test_incremental_sync_with_no_changes(
-        self, mock_hubspot_client, mock_supabase_client
+        self, mock_hubspot_client, mock_supabase_client  # noqa: ARG002
     ):
         """Test incremental sync when no contacts modified."""
         mock_hubspot_client.get_contacts_modified_since = AsyncMock(

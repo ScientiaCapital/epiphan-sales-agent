@@ -2,8 +2,6 @@
 
 from typing import get_type_hints
 
-import pytest
-
 
 class TestCompetitorIntelState:
     """Tests for CompetitorIntelState."""

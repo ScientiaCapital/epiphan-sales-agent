@@ -206,7 +206,7 @@ class TestLeadsScoreEndpoint:
         assert data["success"] is True
         assert data["leads_scored"] == 2
 
-    def test_score_with_limit(self, client, mock_supabase, mock_lead_scorer):
+    def test_score_with_limit(self, client, mock_supabase, mock_lead_scorer):  # noqa: ARG002
         """Test scoring with limit parameter."""
         mock_supabase.get_unscored_leads = MagicMock(return_value=[])
 

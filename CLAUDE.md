@@ -33,16 +33,31 @@ cd backend && uv run uvicorn app.main:app --reload --port 8001
 backend/
 ├── app/
 │   ├── main.py              # FastAPI app entry
+│   ├── api/routes/
+│   │   ├── agents.py        # LangGraph agent endpoints
+│   │   ├── batch.py         # Batch processing endpoint
+│   │   ├── scripts.py       # Script endpoints
+│   │   └── leads.py         # Lead scoring endpoints
 │   ├── data/
 │   │   ├── schemas.py       # Pydantic models
 │   │   ├── scripts.py       # Script lookup functions
+│   │   ├── competitors.py   # Competitor battlecards
 │   │   └── persona_warm_scripts.py  # Persona-specific scripts
 │   └── services/
+│       ├── enrichment/      # Data enrichment clients
+│       │   ├── apollo.py    # Apollo.io API
+│       │   ├── clearbit.py  # Clearbit API
+│       │   └── scraper.py   # Web scraping
+│       ├── langgraph/       # AI Agents
+│       │   ├── agents/      # LangGraph agents
+│       │   ├── tools/       # Agent tools
+│       │   └── states.py    # State schemas
+│       ├── llm/             # LLM clients
+│       │   └── clients.py   # Multi-model router
 │       └── integrations/
-│           ├── hubspot/     # HubSpot CRM client
-│           └── clari/       # Clari Copilot client
+│           └── hubspot/     # HubSpot CRM client
 ├── tests/
-│   ├── unit/                # Unit tests
+│   ├── unit/                # Unit tests (340+)
 │   └── integration/         # Integration tests
 └── pyproject.toml
 ```
@@ -63,12 +78,27 @@ backend/
 - pricing_request
 - trial_signup
 
+## LangGraph Agents
+Four AI agents powered by LangGraph + Claude/Cerebras:
+
+1. **Lead Research Agent** - Enriches leads via Apollo, Clearbit, web scraping
+2. **Script Selection Agent** - Selects and personalizes call scripts
+3. **Competitor Intelligence Agent** - Provides battlecard responses
+4. **Email Personalization Agent** - Generates personalized outreach emails
+
+## API Endpoints
+- `POST /api/agents/research` - Research a lead
+- `POST /api/agents/scripts` - Get personalized script
+- `POST /api/agents/competitors` - Get competitor intel
+- `POST /api/agents/emails` - Generate email
+- `POST /api/batch/process` - Process multiple leads
+
 ## Known Issues
-- 250 ruff lint errors (mostly auto-fixable PEP 604/585 style)
-- 47 mypy errors (missing type stubs for fastapi, hubspot)
+- mypy errors (missing type stubs for fastapi, hubspot)
 - supabase module not installed for integration tests
 
-## Recent Work
-- Implemented persona-specific warm call scripts (ACQP framework)
-- Added test coverage for all 8 personas
-- 50 tests passing
+## Recent Work (2025-01-27)
+- Implemented 4 LangGraph agents (Lead Research, Script Selection, Competitor Intel, Email Personalization)
+- Built enrichment clients (Apollo, Clearbit, Web Scraper)
+- Added agent API endpoints and batch processing
+- 340 tests passing, 0 lint errors

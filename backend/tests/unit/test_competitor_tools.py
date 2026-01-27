@@ -1,6 +1,5 @@
 """Tests for competitor intelligence tools."""
 
-import pytest
 
 
 class TestGetBattlecard:

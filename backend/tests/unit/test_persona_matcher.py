@@ -5,7 +5,7 @@ TDD tests for matching leads to buyer personas using title and company signals.
 
 import pytest
 
-from app.services.scoring.persona_matcher import PersonaMatcher, PersonaMatch
+from app.services.scoring.persona_matcher import PersonaMatch, PersonaMatcher
 
 
 class TestPersonaMatcher:

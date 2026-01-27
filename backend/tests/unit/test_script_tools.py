@@ -1,6 +1,5 @@
 """Tests for script selection tools."""
 
-import pytest
 
 
 class TestGetWarmScript:
