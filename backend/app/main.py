@@ -5,8 +5,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.competitors import router as competitors_router
+from app.api.routes.leads import router as leads_router
+from app.api.routes.personas import router as personas_router
 from app.api.routes.scripts import router as scripts_router
 from app.core.config import settings
+from app.core.rate_limit import setup_rate_limiting
 
 
 @asynccontextmanager
@@ -38,6 +42,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Rate limiting (100 req/min per IP)
+setup_rate_limiting(app)
+
 
 @app.get("/")
 async def root():
@@ -57,3 +64,6 @@ async def health():
 
 # Include routers
 app.include_router(scripts_router, prefix="/api/scripts", tags=["scripts"])
+app.include_router(personas_router, prefix="/api/personas", tags=["personas"])
+app.include_router(competitors_router, prefix="/api/competitors", tags=["competitors"])
+app.include_router(leads_router, prefix="/api", tags=["leads"])

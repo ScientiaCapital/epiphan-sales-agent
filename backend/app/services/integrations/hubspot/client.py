@@ -69,6 +69,88 @@ class HubSpotClient:
             "paging": response.paging.to_dict() if response.paging else None,
         }
 
+    async def get_contacts_modified_since(
+        self,
+        since: datetime,
+        limit: int = 100,
+        properties: list[str] | None = None,
+        after: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Fetch contacts modified since a given datetime.
+
+        Used for incremental sync to only fetch recently updated contacts.
+
+        Args:
+            since: Only return contacts modified after this datetime
+            limit: Number of results per page
+            properties: List of properties to fetch
+            after: Pagination cursor
+
+        Returns:
+            Dict with results and paging info
+        """
+        default_properties = [
+            "email",
+            "firstname",
+            "lastname",
+            "company",
+            "jobtitle",
+            "phone",
+            "linkedin",
+            "city",
+            "state",
+            "country",
+            "lifecyclestage",
+            "hs_lead_status",
+            "hubspot_owner_id",
+            "createdate",
+            "lastmodifieddate",
+            "num_contacted_notes",
+            "notes_last_contacted",
+        ]
+
+        props = properties or default_properties
+
+        # Convert datetime to Unix timestamp in milliseconds (HubSpot format)
+        since_ms = int(since.timestamp() * 1000)
+
+        # Use search API with lastmodifieddate filter
+        filter_groups = [
+            {
+                "filters": [
+                    {
+                        "propertyName": "lastmodifieddate",
+                        "operator": "GTE",
+                        "value": str(since_ms),
+                    },
+                    {
+                        "propertyName": "email",
+                        "operator": "HAS_PROPERTY",
+                    },
+                ]
+            }
+        ]
+
+        search_request: dict[str, Any] = {
+            "filterGroups": filter_groups,
+            "properties": props,
+            "limit": limit,
+            "sorts": [{"propertyName": "lastmodifieddate", "direction": "ASCENDING"}],
+        }
+
+        if after:
+            search_request["after"] = after
+
+        response = self.client.crm.contacts.search_api.do_search(
+            public_object_search_request=search_request
+        )
+
+        return {
+            "results": [self._contact_to_dict(c) for c in response.results],
+            "paging": response.paging.to_dict() if response.paging else None,
+        }
+
     async def get_untouched_contacts(self, limit: int = 1000) -> list[dict[str, Any]]:
         """
         Find contacts with no outreach (prime BDR targets).

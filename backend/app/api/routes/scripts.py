@@ -3,9 +3,11 @@
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import JSONResponse
 
-from app.data.schemas import PersonaType, TriggerType, WarmCallScript
-from app.data.scripts import get_warm_script_for_call
+from app.core.cache import with_cache_headers
+from app.data.schemas import ColdCallScript, PersonaType, TriggerType, Vertical, WarmCallScript
+from app.data.scripts import get_script_by_vertical, get_warm_script_for_call
 
 router = APIRouter()
 
@@ -75,3 +77,52 @@ async def get_warm_script(
         )
 
     return script
+
+
+# Type alias for vertical query parameter
+VerticalParam = Annotated[
+    Vertical,
+    Query(description="Target vertical market for cold call script"),
+]
+
+
+@router.get(
+    "/cold",
+    response_model=ColdCallScript,
+    summary="Get cold call script by vertical",
+    description="""
+    Returns a cold call script tailored to the specified vertical market.
+
+    **Script Structure:**
+    - **Pattern Interrupt**: Opening to get attention (not the standard "how are you")
+    - **Value Hook**: Reference customer + outcome (social proof)
+    - **Pain Question**: Uncover their specific pain point
+    - **Permission**: Ask for time to explain
+    - **Pivot**: Handle initial brush-off
+
+    **Available Verticals:**
+    - `higher_ed`: Lecture capture, classroom technology
+    - `corporate`: Training, executive communications
+    - `healthcare`: Simulation centers, HIPAA compliance
+    - `house_of_worship`: Volunteer-friendly, reliability
+    - `government`: Courts, Open Meeting Law
+    - `live_events`: Production, broadcast quality
+    - `industrial`: EHS training, knowledge transfer
+    """,
+    responses={
+        200: {"description": "Cold call script returned successfully"},
+        404: {"description": "No script found for this vertical"},
+        422: {"description": "Invalid vertical value"},
+    },
+)
+async def get_cold_script(vertical: VerticalParam) -> JSONResponse:
+    """Get cold call script for BDR team by target vertical."""
+    script = get_script_by_vertical(vertical)
+
+    if script is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No cold call script found for vertical={vertical.value}",
+        )
+
+    return with_cache_headers(script)
