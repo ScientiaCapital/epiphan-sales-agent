@@ -5,6 +5,7 @@ Exposes agent functionality through REST endpoints:
 - /api/agents/scripts - Script selection and personalization
 - /api/agents/competitors - Competitor intelligence
 - /api/agents/emails - Email personalization
+- /api/agents/qualify - Lead qualification against ICP criteria
 """
 
 from typing import Any
@@ -17,9 +18,10 @@ from app.services.langgraph.agents import (
     CompetitorIntelAgent,
     EmailPersonalizationAgent,
     LeadResearchAgent,
+    QualificationAgent,
     ScriptSelectionAgent,
 )
-from app.services.langgraph.states import ResearchBrief
+from app.services.langgraph.states import QualificationTier, ResearchBrief
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
@@ -28,6 +30,7 @@ lead_research_agent = LeadResearchAgent()
 script_selection_agent = ScriptSelectionAgent()
 competitor_intel_agent = CompetitorIntelAgent()
 email_personalization_agent = EmailPersonalizationAgent()
+qualification_agent = QualificationAgent()
 
 
 # Request/Response Models
@@ -206,4 +209,116 @@ async def personalize_email(request: EmailRequest) -> EmailResponse:
         subject_line=result.get("subject_line", ""),
         email_body=result.get("email_body", ""),
         follow_up_note=result.get("follow_up_note"),
+    )
+
+
+# Qualification Models
+class QualificationRequest(BaseModel):
+    """Request for lead qualification."""
+
+    lead: Lead
+    enrichment_data: dict[str, Any] | None = Field(
+        default=None,
+        description="Pre-fetched enrichment data: {'apollo': {...}, 'clearbit': {...}}",
+    )
+    skip_enrichment: bool = Field(
+        default=False,
+        description="If True, skip API enrichment and use provided data only",
+    )
+
+
+class DimensionScoreResponse(BaseModel):
+    """Score breakdown for a single ICP dimension."""
+
+    category: str
+    raw_score: int
+    weighted_score: float
+    reason: str
+    confidence: float
+
+
+class ScoreBreakdownResponse(BaseModel):
+    """Complete ICP score breakdown."""
+
+    company_size: DimensionScoreResponse
+    industry_vertical: DimensionScoreResponse
+    use_case_fit: DimensionScoreResponse
+    tech_stack_signals: DimensionScoreResponse
+    buying_authority: DimensionScoreResponse
+
+
+class NextActionResponse(BaseModel):
+    """Recommended next action."""
+
+    action_type: str
+    description: str
+    priority: str
+    ae_involvement: bool
+    missing_info: list[str]
+
+
+class QualificationResponse(BaseModel):
+    """Response from lead qualification."""
+
+    total_score: float = Field(description="Weighted ICP score (0-100)")
+    tier: QualificationTier = Field(description="Qualification tier")
+    score_breakdown: ScoreBreakdownResponse
+    confidence: float = Field(description="Overall confidence (0.0-1.0)")
+    next_action: NextActionResponse
+    missing_info: list[str] = Field(description="Data gaps identified")
+    persona_match: str | None = Field(description="Matched persona if detected")
+
+
+@router.post("/qualify", response_model=QualificationResponse)
+async def qualify_lead(request: QualificationRequest) -> QualificationResponse:
+    """
+    Qualify a lead against ICP criteria.
+
+    Scores the lead across 5 weighted dimensions:
+    - Company Size (25%)
+    - Industry Vertical (20%)
+    - Use Case Fit (25%)
+    - Tech Stack Signals (15%)
+    - Buying Authority (15%)
+
+    Returns qualification tier and recommended next action.
+    """
+    result = await qualification_agent.run(
+        lead=request.lead,
+        enrichment_data=request.enrichment_data,
+        skip_enrichment=request.skip_enrichment,
+    )
+
+    # Convert score breakdown
+    breakdown = result.get("score_breakdown", {})
+    score_breakdown = ScoreBreakdownResponse(
+        company_size=DimensionScoreResponse(**breakdown.get("company_size", {})),
+        industry_vertical=DimensionScoreResponse(
+            **breakdown.get("industry_vertical", {})
+        ),
+        use_case_fit=DimensionScoreResponse(**breakdown.get("use_case_fit", {})),
+        tech_stack_signals=DimensionScoreResponse(
+            **breakdown.get("tech_stack_signals", {})
+        ),
+        buying_authority=DimensionScoreResponse(**breakdown.get("buying_authority", {})),
+    )
+
+    # Convert next action
+    action = result.get("next_action", {})
+    next_action = NextActionResponse(
+        action_type=action.get("action_type", ""),
+        description=action.get("description", ""),
+        priority=action.get("priority", "low"),
+        ae_involvement=action.get("ae_involvement", False),
+        missing_info=action.get("missing_info", []),
+    )
+
+    return QualificationResponse(
+        total_score=result.get("total_score", 0.0),
+        tier=result.get("tier", QualificationTier.NOT_ICP),
+        score_breakdown=score_breakdown,
+        confidence=result.get("confidence", 0.0),
+        next_action=next_action,
+        missing_info=result.get("missing_info", []),
+        persona_match=result.get("persona_match"),
     )
