@@ -5,12 +5,17 @@ Exposes agent functionality through REST endpoints:
 - /api/agents/scripts - Script selection and personalization
 - /api/agents/competitors - Competitor intelligence
 - /api/agents/emails - Email personalization
+- /api/agents/emails/with-approval - Email with human-in-the-loop approval
+- /api/agents/emails/approve/{thread_id} - Approve/reject pending email
 - /api/agents/qualify - Lead qualification against ICP criteria
+- /api/agents/qualify/stream - Streaming qualification progress
 """
 
+import json
 from typing import Any
 
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.data.lead_schemas import Lead
@@ -321,4 +326,150 @@ async def qualify_lead(request: QualificationRequest) -> QualificationResponse:
         next_action=next_action,
         missing_info=result.get("missing_info", []),
         persona_match=result.get("persona_match"),
+    )
+
+
+# =============================================================================
+# Streaming Qualification Endpoint
+# =============================================================================
+
+
+@router.post("/qualify/stream")
+async def qualify_lead_stream(request: QualificationRequest) -> StreamingResponse:
+    """
+    Qualify lead with streaming progress updates.
+
+    Returns Server-Sent Events (SSE) stream with progress from each
+    qualification step: gather_data → score_dimensions → calculate_final → recommend_action
+
+    Use this for real-time UI feedback during qualification.
+    """
+    async def event_stream():
+        async for event in qualification_agent.stream(
+            lead=request.lead,
+            enrichment_data=request.enrichment_data,
+            skip_enrichment=request.skip_enrichment,
+        ):
+            # Format as SSE
+            yield f"data: {json.dumps(event)}\n\n"
+
+        # Send completion event
+        yield f"data: {json.dumps({'node': 'complete', 'updates': {}, 'timestamp': ''})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+# =============================================================================
+# Email Approval Workflow Endpoints
+# =============================================================================
+
+
+class EmailApprovalPending(BaseModel):
+    """Response when email is pending approval."""
+
+    thread_id: str = Field(description="Thread ID for approval workflow")
+    email_preview: str = Field(description="Generated email body preview")
+    subject_preview: str = Field(description="Generated subject line preview")
+    lead_email: str | None = Field(description="Target lead email")
+    lead_company: str | None = Field(description="Target lead company")
+    status: str = Field(default="pending_approval")
+
+
+class EmailApprovalInput(BaseModel):
+    """Input for email approval decision."""
+
+    approved: bool = Field(description="Whether to approve the email")
+    feedback: str | None = Field(
+        default=None,
+        description="Optional feedback/reason for rejection",
+    )
+
+
+class EmailApprovalResponse(BaseModel):
+    """Response from email approval."""
+
+    thread_id: str
+    approved: bool
+    subject_line: str = ""
+    email_body: str = ""
+    follow_up_note: str | None = None
+    rejection_reason: str | None = None
+
+
+@router.post("/emails/with-approval", response_model=EmailApprovalPending)
+async def generate_email_with_approval(request: EmailRequest) -> EmailApprovalPending:
+    """
+    Generate email and pause for human approval.
+
+    Creates a draft email using the personalization agent,
+    then pauses execution for human review. Use the
+    /emails/approve/{thread_id} endpoint to approve or reject.
+
+    Workflow:
+    1. Call this endpoint to generate draft
+    2. Review email_preview and subject_preview
+    3. Call /emails/approve/{thread_id} with decision
+    """
+    # Convert dict to ResearchBrief if provided
+    research_brief: ResearchBrief | None = None
+    if request.research_brief:
+        research_brief = {
+            "company_overview": request.research_brief.get("company_overview", ""),
+            "recent_news": request.research_brief.get("recent_news", []),
+            "talking_points": request.research_brief.get("talking_points", []),
+            "risk_factors": request.research_brief.get("risk_factors", []),
+            "linkedin_summary": request.research_brief.get("linkedin_summary"),
+        }
+
+    result = await email_personalization_agent.run_with_approval(
+        lead=request.lead,
+        research_brief=research_brief,
+        persona=request.persona,
+        email_type=request.email_type,
+        sequence_step=request.sequence_step,
+    )
+
+    return EmailApprovalPending(
+        thread_id=result["thread_id"],
+        email_preview=result["email_preview"],
+        subject_preview=result["subject_preview"],
+        lead_email=result.get("lead_email"),
+        lead_company=result.get("lead_company"),
+        status=result["status"],
+    )
+
+
+@router.post("/emails/approve/{thread_id}", response_model=EmailApprovalResponse)
+async def approve_email(thread_id: str, approval: EmailApprovalInput) -> EmailApprovalResponse:
+    """
+    Approve or reject a pending email.
+
+    Completes the human-in-the-loop workflow started by
+    /emails/with-approval. If approved, finalizes the email.
+    If rejected, returns the rejection reason.
+
+    Args:
+        thread_id: Thread ID from /emails/with-approval response
+        approval: Approval decision and optional feedback
+    """
+    result = await email_personalization_agent.approve(
+        thread_id=thread_id,
+        approved=approval.approved,
+        feedback=approval.feedback,
+    )
+
+    return EmailApprovalResponse(
+        thread_id=result["thread_id"],
+        approved=result["approved"],
+        subject_line=result.get("subject_line", ""),
+        email_body=result.get("email_body", ""),
+        follow_up_note=result.get("follow_up_note"),
+        rejection_reason=result.get("rejection_reason"),
     )

@@ -12,12 +12,20 @@ Tier Thresholds (0-100 weighted scale):
 - Tier 2 (50-69): Standard sequence
 - Tier 3 (30-49): Light touch, marketing nurture
 - Not ICP (<30): Disqualify
+
+Features:
+- PostgresSaver checkpointing for state persistence
+- Streaming support for progress updates
+- Thread ID support for workflow tracking
 """
 
 import asyncio
+from collections.abc import AsyncGenerator
+from datetime import datetime
 from typing import Any
 
 from app.data.lead_schemas import Lead
+from app.services.langgraph.checkpointing import get_checkpointer
 from app.services.langgraph.states import (
     DimensionScore,
     ICPScoreBreakdown,
@@ -331,39 +339,20 @@ class QualificationAgent:
             "next_action": next_action,
         }
 
-    async def run(
+    def _prepare_initial_state(
         self,
         lead: Lead,
         enrichment_data: dict[str, Any] | None = None,
         skip_enrichment: bool = False,
-    ) -> dict[str, Any]:
-        """
-        Run lead qualification and return score + tier.
-
-        Args:
-            lead: Lead to qualify
-            enrichment_data: Optional pre-fetched enrichment data
-                {"apollo": {...}, "clearbit": {...}}
-            skip_enrichment: If True, don't call enrichment APIs
-
-        Returns:
-            Dict with total_score, tier, score_breakdown, confidence, next_action, missing_info
-        """
-        # Build graph if needed
-        if self._graph is None:
-            self._graph = self._build_graph()
-
-        # Compile graph
-        compiled = self._graph.compile()
-
-        # Prepare initial state
+    ) -> QualificationState:
+        """Prepare initial state for qualification workflow."""
         apollo_data = None
         clearbit_data = None
         if enrichment_data:
             apollo_data = enrichment_data.get("apollo")
             clearbit_data = enrichment_data.get("clearbit")
 
-        initial_state: QualificationState = {
+        return {
             "lead": lead,
             "skip_enrichment": skip_enrichment,
             "apollo_data": apollo_data,
@@ -380,9 +369,8 @@ class QualificationAgent:
             "missing_info": [],
         }
 
-        # Run the graph
-        result = await compiled.ainvoke(initial_state)
-
+    def _extract_result(self, result: dict[str, Any]) -> dict[str, Any]:
+        """Extract final result from state."""
         return {
             "total_score": result.get("total_score", 0.0),
             "tier": result.get("tier"),
@@ -392,3 +380,130 @@ class QualificationAgent:
             "missing_info": result.get("missing_info", []),
             "persona_match": result.get("persona_match"),
         }
+
+    async def run(
+        self,
+        lead: Lead,
+        enrichment_data: dict[str, Any] | None = None,
+        skip_enrichment: bool = False,
+        thread_id: str | None = None,
+        use_checkpointing: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Run lead qualification and return score + tier.
+
+        Args:
+            lead: Lead to qualify
+            enrichment_data: Optional pre-fetched enrichment data
+                {"apollo": {...}, "clearbit": {...}}
+            skip_enrichment: If True, don't call enrichment APIs
+            thread_id: Optional thread ID for checkpointing
+            use_checkpointing: If True, enable persistent checkpointing
+
+        Returns:
+            Dict with total_score, tier, score_breakdown, confidence, next_action, missing_info
+        """
+        # Build graph if needed
+        if self._graph is None:
+            self._graph = self._build_graph()
+
+        # Compile with optional checkpointing
+        checkpointer = get_checkpointer() if use_checkpointing else None
+        compiled = self._graph.compile(checkpointer=checkpointer)
+
+        # Prepare initial state
+        initial_state = self._prepare_initial_state(lead, enrichment_data, skip_enrichment)
+
+        # Prepare config with optional thread_id
+        config: dict[str, Any] = {}
+        if thread_id:
+            config = {"configurable": {"thread_id": thread_id}}
+
+        # Run the graph
+        result = await compiled.ainvoke(initial_state, config=config if config else None)
+
+        return self._extract_result(result)
+
+    async def stream(
+        self,
+        lead: Lead,
+        enrichment_data: dict[str, Any] | None = None,
+        skip_enrichment: bool = False,
+        thread_id: str | None = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """
+        Stream qualification progress updates.
+
+        Yields progress events as each node completes, useful for
+        real-time UI updates via SSE.
+
+        Args:
+            lead: Lead to qualify
+            enrichment_data: Optional pre-fetched enrichment data
+            skip_enrichment: If True, don't call enrichment APIs
+            thread_id: Optional thread ID for checkpointing
+
+        Yields:
+            Progress events with node name, updates, and timestamp
+        """
+        # Build graph if needed
+        if self._graph is None:
+            self._graph = self._build_graph()
+
+        # Compile (optionally with checkpointing)
+        checkpointer = get_checkpointer() if thread_id else None
+        compiled = self._graph.compile(checkpointer=checkpointer)
+
+        # Prepare initial state
+        initial_state = self._prepare_initial_state(lead, enrichment_data, skip_enrichment)
+
+        # Prepare config
+        config: dict[str, Any] = {}
+        if thread_id:
+            config = {"configurable": {"thread_id": thread_id}}
+
+        # Stream with updates mode
+        async for event in compiled.astream(
+            initial_state,
+            config=config if config else None,
+            stream_mode="updates",
+        ):
+            # Extract node name from event keys
+            node_name = list(event.keys())[0] if event else None
+
+            yield {
+                "node": node_name,
+                "updates": event.get(node_name, {}) if node_name else {},
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+    async def resume(
+        self,
+        thread_id: str,
+        human_input: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Resume a paused qualification workflow.
+
+        Used for human-in-the-loop workflows where the agent
+        was interrupted waiting for input.
+
+        Args:
+            thread_id: Thread ID of paused workflow
+            human_input: Optional human input to provide
+
+        Returns:
+            Final qualification result
+        """
+        if self._graph is None:
+            self._graph = self._build_graph()
+
+        checkpointer = get_checkpointer()
+        compiled = self._graph.compile(checkpointer=checkpointer)
+
+        config = {"configurable": {"thread_id": thread_id}}
+
+        # Resume with human input
+        result = await compiled.ainvoke(human_input, config=config)
+
+        return self._extract_result(result)

@@ -2,12 +2,20 @@
 
 Uses LLM to generate compelling, personalized emails based on
 research briefs, persona data, and email templates.
+
+Features:
+- Human-in-the-loop approval workflow
+- PostgresSaver checkpointing for state persistence
+- Thread ID support for workflow tracking
 """
 
 import re
+from collections.abc import AsyncGenerator
+from datetime import datetime
 from typing import Any
 
 from app.data.lead_schemas import Lead
+from app.services.langgraph.checkpointing import get_checkpointer
 from app.services.langgraph.states import EmailPersonalizationState, ResearchBrief
 from app.services.langgraph.tools.email_tools import (
     build_email_prompt,
@@ -160,36 +168,16 @@ class EmailPersonalizationAgent:
             "linkedin_summary": None,
         }
 
-    async def run(
+    def _prepare_initial_state(
         self,
         lead: Lead,
         research_brief: ResearchBrief | None = None,
         persona: dict[str, Any] | None = None,
         email_type: str = "pattern_interrupt",
         sequence_step: int = 1,
-    ) -> dict[str, Any]:
-        """
-        Generate a personalized email.
-
-        Args:
-            lead: Target lead
-            research_brief: Research intelligence (optional)
-            persona: Persona data (optional)
-            email_type: Type of email (pattern_interrupt, pain_point, breakup, nurture)
-            sequence_step: Current sequence step (1-4)
-
-        Returns:
-            Dict with subject_line, email_body, follow_up_note
-        """
-        # Build graph if needed
-        if self._graph is None:
-            self._graph = self._build_graph()
-
-        # Compile and run
-        compiled = self._graph.compile()
-
-        # Initial state
-        initial_state: EmailPersonalizationState = {
+    ) -> EmailPersonalizationState:
+        """Prepare initial state for email generation."""
+        return {
             "lead": lead,
             "research_brief": research_brief,
             "persona": persona,
@@ -202,14 +190,208 @@ class EmailPersonalizationAgent:
             "follow_up_note": None,
         }
 
-        # Run the graph
-        result = await compiled.ainvoke(initial_state)
-
+    def _extract_result(self, result: dict[str, Any]) -> dict[str, Any]:
+        """Extract email result from state."""
         return {
             "subject_line": result.get("subject_line", ""),
             "email_body": result.get("email_body", ""),
             "follow_up_note": result.get("follow_up_note"),
         }
+
+    async def run(
+        self,
+        lead: Lead,
+        research_brief: ResearchBrief | None = None,
+        persona: dict[str, Any] | None = None,
+        email_type: str = "pattern_interrupt",
+        sequence_step: int = 1,
+        thread_id: str | None = None,
+        use_checkpointing: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Generate a personalized email.
+
+        Args:
+            lead: Target lead
+            research_brief: Research intelligence (optional)
+            persona: Persona data (optional)
+            email_type: Type of email (pattern_interrupt, pain_point, breakup, nurture)
+            sequence_step: Current sequence step (1-4)
+            thread_id: Optional thread ID for checkpointing
+            use_checkpointing: If True, enable persistent checkpointing
+
+        Returns:
+            Dict with subject_line, email_body, follow_up_note
+        """
+        # Build graph if needed
+        if self._graph is None:
+            self._graph = self._build_graph()
+
+        # Compile with optional checkpointing
+        checkpointer = get_checkpointer() if use_checkpointing else None
+        compiled = self._graph.compile(checkpointer=checkpointer)
+
+        # Initial state
+        initial_state = self._prepare_initial_state(
+            lead, research_brief, persona, email_type, sequence_step
+        )
+
+        # Prepare config with optional thread_id
+        config: dict[str, Any] = {}
+        if thread_id:
+            config = {"configurable": {"thread_id": thread_id}}
+
+        # Run the graph
+        result = await compiled.ainvoke(initial_state, config=config if config else None)
+
+        return self._extract_result(result)
+
+    async def run_with_approval(
+        self,
+        lead: Lead,
+        research_brief: ResearchBrief | None = None,
+        persona: dict[str, Any] | None = None,
+        email_type: str = "pattern_interrupt",
+        sequence_step: int = 1,
+        thread_id: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Generate email and pause for human approval.
+
+        This creates a draft email and pauses execution, allowing
+        a human to review and approve/reject before finalizing.
+
+        Args:
+            lead: Target lead
+            research_brief: Research intelligence (optional)
+            persona: Persona data (optional)
+            email_type: Type of email
+            sequence_step: Current sequence step (1-4)
+            thread_id: Thread ID for tracking (generated if not provided)
+
+        Returns:
+            Dict with thread_id, email_preview, subject_preview, status
+        """
+        # Generate thread_id if not provided
+        if not thread_id:
+            thread_id = f"email_{lead.hubspot_id}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+
+        # Build graph if needed
+        if self._graph is None:
+            self._graph = self._build_graph()
+
+        # Compile with checkpointing (required for approval workflow)
+        checkpointer = get_checkpointer()
+        compiled = self._graph.compile(
+            checkpointer=checkpointer,
+            interrupt_before=["parse_output"],  # Pause before finalizing
+        )
+
+        # Initial state
+        initial_state = self._prepare_initial_state(
+            lead, research_brief, persona, email_type, sequence_step
+        )
+
+        config = {"configurable": {"thread_id": thread_id}}
+
+        # Run until interrupt
+        result = await compiled.ainvoke(initial_state, config=config)
+
+        return {
+            "thread_id": thread_id,
+            "email_preview": result.get("email_body", ""),
+            "subject_preview": result.get("subject_line", ""),
+            "lead_email": lead.email,
+            "lead_company": lead.company,
+            "status": "pending_approval",
+        }
+
+    async def approve(
+        self,
+        thread_id: str,
+        approved: bool = True,
+        feedback: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Approve or reject a pending email.
+
+        Args:
+            thread_id: Thread ID of the pending email
+            approved: Whether the email is approved
+            feedback: Optional feedback for rejection
+
+        Returns:
+            Final result with approval status
+        """
+        if self._graph is None:
+            self._graph = self._build_graph()
+
+        checkpointer = get_checkpointer()
+        compiled = self._graph.compile(checkpointer=checkpointer)
+
+        config = {"configurable": {"thread_id": thread_id}}
+
+        if approved:
+            # Resume and complete the workflow
+            result = await compiled.ainvoke(None, config=config)
+            return {
+                **self._extract_result(result),
+                "approved": True,
+                "thread_id": thread_id,
+            }
+        else:
+            # Return rejection without completing
+            return {
+                "subject_line": "",
+                "email_body": "",
+                "follow_up_note": None,
+                "approved": False,
+                "rejection_reason": feedback,
+                "thread_id": thread_id,
+            }
+
+    async def stream(
+        self,
+        lead: Lead,
+        research_brief: ResearchBrief | None = None,
+        persona: dict[str, Any] | None = None,
+        email_type: str = "pattern_interrupt",
+        sequence_step: int = 1,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """
+        Stream email generation progress.
+
+        Yields progress events as each node completes.
+
+        Args:
+            lead: Target lead
+            research_brief: Research intelligence (optional)
+            persona: Persona data (optional)
+            email_type: Type of email
+            sequence_step: Current sequence step (1-4)
+
+        Yields:
+            Progress events with node name, updates, and timestamp
+        """
+        if self._graph is None:
+            self._graph = self._build_graph()
+
+        compiled = self._graph.compile()
+        initial_state = self._prepare_initial_state(
+            lead, research_brief, persona, email_type, sequence_step
+        )
+
+        async for event in compiled.astream(
+            initial_state,
+            stream_mode="updates",
+        ):
+            node_name = list(event.keys())[0] if event else None
+
+            yield {
+                "node": node_name,
+                "updates": event.get(node_name, {}) if node_name else {},
+                "timestamp": datetime.utcnow().isoformat(),
+            }
 
 
 # Singleton instance
