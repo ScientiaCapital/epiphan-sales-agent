@@ -278,7 +278,7 @@ def classify_use_case(
 
 def classify_tech_stack(
     tech_stack: list[str] | None,
-    clearbit_data: dict[str, Any] | None = None,
+    enrichment_data: dict[str, Any] | None = None,
 ) -> tuple[str, int, str]:
     """
     Classify tech stack signals and return score.
@@ -290,15 +290,15 @@ def classify_tech_stack(
 
     Args:
         tech_stack: List of tech/tools from enrichment
-        clearbit_data: Clearbit data which may contain tech_stack
+        enrichment_data: Enrichment data which may contain tech_stack
 
     Returns:
         Tuple of (category, score, reason)
     """
-    # Extract tech stack from clearbit if not provided
+    # Extract tech stack from enrichment data if not provided
     stack = tech_stack or []
-    if not stack and clearbit_data:
-        stack = clearbit_data.get("tech_stack", [])
+    if not stack and enrichment_data:
+        stack = enrichment_data.get("tech_stack", [])
 
     if not stack:
         return ("No solution", 5, "No tech stack information available")

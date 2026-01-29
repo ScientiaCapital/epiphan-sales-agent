@@ -21,7 +21,6 @@ from app.services.langgraph.tools.harvester_mapper import (
 from app.services.langgraph.tools.research_tools import (
     combine_enrichment_data,
     enrich_from_apollo,
-    enrich_from_clearbit,
     get_company_domain,
     scrape_company_news,
     scrape_company_website,
@@ -43,7 +42,6 @@ __all__ = [
     "get_persona_profile",
     # Research tools
     "enrich_from_apollo",
-    "enrich_from_clearbit",
     "scrape_company_website",
     "scrape_company_news",
     "get_company_domain",

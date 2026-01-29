@@ -169,7 +169,7 @@ class Lead(Base, TimestampMixin):
     utm_source: Mapped[str | None] = mapped_column(String(100))
     utm_campaign: Mapped[str | None] = mapped_column(String(100))
 
-    # Enrichment Data (JSON blob from Apollo/Clearbit)
+    # Enrichment Data (JSON blob from Apollo)
     enrichment_data: Mapped[dict | None] = mapped_column(JSONB)
     enriched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

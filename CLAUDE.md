@@ -68,9 +68,8 @@ backend/
 │   │   └── persona_warm_scripts.py  # Persona-specific scripts
 │   └── services/
 │       ├── enrichment/      # Data enrichment clients
-│       │   ├── apollo.py    # Apollo.io API
+│       │   ├── apollo.py    # Apollo.io API (primary enrichment)
 │       │   ├── audit.py     # Enrichment audit logging & HubSpot mapping
-│       │   ├── clearbit.py  # Clearbit API
 │       │   ├── pipeline.py  # Background processing pipeline
 │       │   └── scraper.py   # Web scraping
 │       ├── scoring/         # Lead scoring services
@@ -108,7 +107,7 @@ backend/
 ## LangGraph Agents
 Five AI agents powered by LangGraph + Claude/Cerebras:
 
-1. **Lead Research Agent** - Enriches leads via Apollo, Clearbit, web scraping
+1. **Lead Research Agent** - Enriches leads via Apollo, web scraping
 2. **Script Selection Agent** - Selects and personalizes call scripts
 3. **Competitor Intelligence Agent** - Provides battlecard responses
 4. **Email Personalization Agent** - Generates personalized outreach emails
@@ -286,5 +285,5 @@ API Request → Immediate: employer phone only
 
 ## Earlier Work (2025-01-27)
 - Implemented 4 LangGraph agents (Lead Research, Script Selection, Competitor Intel, Email Personalization)
-- Built enrichment clients (Apollo, Clearbit, Web Scraper)
+- Built enrichment clients (Apollo, Web Scraper)
 - Added agent API endpoints and batch processing

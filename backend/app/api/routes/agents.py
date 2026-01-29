@@ -125,7 +125,7 @@ async def research_lead(request: ResearchRequest) -> ResearchResponse:
     """
     Research a lead and generate intelligence brief.
 
-    Uses Apollo, Clearbit, and web scraping to gather information,
+    Uses Apollo and web scraping to gather information,
     then synthesizes into talking points and risk factors.
     """
     result = await lead_research_agent.run(
@@ -224,7 +224,7 @@ class QualificationRequest(BaseModel):
     lead: Lead
     enrichment_data: dict[str, Any] | None = Field(
         default=None,
-        description="Pre-fetched enrichment data: {'apollo': {...}, 'clearbit': {...}}",
+        description="Pre-fetched enrichment data: {'apollo': {...}}",
     )
     skip_enrichment: bool = Field(
         default=False,

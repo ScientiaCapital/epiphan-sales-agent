@@ -95,7 +95,6 @@ class Settings(BaseSettings):
     # Enrichment APIs
     apollo_api_key: str = Field(default="")
     hunter_api_key: str = Field(default="")
-    clearbit_api_key: str = Field(default="")
 
     # Apollo Webhooks (PHONES ARE GOLD!)
     # See docs/reference/APOLLO_ENRICHMENT.md for details

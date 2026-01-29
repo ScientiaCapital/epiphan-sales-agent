@@ -43,10 +43,6 @@ class TestLeadResearchAgent:
                 new_callable=AsyncMock,
             ) as mock_apollo,
             patch(
-                "app.services.langgraph.agents.lead_research.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-            patch(
                 "app.services.langgraph.agents.lead_research.scrape_company_website",
                 new_callable=AsyncMock,
             ) as mock_scrape,
@@ -59,12 +55,8 @@ class TestLeadResearchAgent:
                 "first_name": "Sarah",
                 "title": "Director of AV Services",
                 "seniority": "director",
-            }
-            mock_clearbit.return_value = {
-                "name": "State University",
                 "industry": "Higher Education",
                 "employees": 5000,
-                "tech_stack": ["Canvas", "Zoom"],
             }
             mock_scrape.return_value = {
                 "about_text": "State University is a leading research institution..."
@@ -92,10 +84,6 @@ class TestLeadResearchAgent:
                 new_callable=AsyncMock,
             ) as mock_apollo,
             patch(
-                "app.services.langgraph.agents.lead_research.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-            patch(
                 "app.services.langgraph.agents.lead_research.scrape_company_website",
                 new_callable=AsyncMock,
             ) as mock_scrape,
@@ -106,7 +94,6 @@ class TestLeadResearchAgent:
         ):
             # All sources return None/empty
             mock_apollo.return_value = None
-            mock_clearbit.return_value = None
             mock_scrape.return_value = None
             mock_news.return_value = []
 
@@ -129,10 +116,6 @@ class TestLeadResearchAgent:
                 new_callable=AsyncMock,
             ) as mock_apollo,
             patch(
-                "app.services.langgraph.agents.lead_research.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-            patch(
                 "app.services.langgraph.agents.lead_research.scrape_company_website",
                 new_callable=AsyncMock,
             ) as mock_scrape,
@@ -141,8 +124,7 @@ class TestLeadResearchAgent:
                 new_callable=AsyncMock,
             ) as mock_news,
         ):
-            mock_apollo.return_value = {"title": "AV Director"}
-            mock_clearbit.return_value = {"industry": "Higher Education"}
+            mock_apollo.return_value = {"title": "AV Director", "industry": "Higher Education"}
             mock_scrape.return_value = None
             mock_news.return_value = []
 
@@ -165,10 +147,6 @@ class TestLeadResearchAgent:
                 new_callable=AsyncMock,
             ) as mock_apollo,
             patch(
-                "app.services.langgraph.agents.lead_research.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-            patch(
                 "app.services.langgraph.agents.lead_research.scrape_company_website",
                 new_callable=AsyncMock,
             ) as mock_scrape,
@@ -177,8 +155,8 @@ class TestLeadResearchAgent:
                 new_callable=AsyncMock,
             ) as mock_news,
         ):
-            mock_apollo.return_value = {"title": "AV Director"}
-            mock_clearbit.return_value = {
+            mock_apollo.return_value = {
+                "title": "AV Director",
                 "industry": "Higher Education",
                 "employees": 5000,
                 "tech_stack": ["Zoom", "Canvas", "Panopto"],
@@ -208,10 +186,6 @@ class TestLeadResearchAgent:
                 new_callable=AsyncMock,
             ) as mock_apollo,
             patch(
-                "app.services.langgraph.agents.lead_research.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-            patch(
                 "app.services.langgraph.agents.lead_research.scrape_company_website",
                 new_callable=AsyncMock,
             ) as mock_scrape,
@@ -221,7 +195,6 @@ class TestLeadResearchAgent:
             ) as mock_news,
         ):
             mock_apollo.return_value = None  # No contact data
-            mock_clearbit.return_value = {"employees": 50}  # Small company
             mock_scrape.return_value = None
             mock_news.return_value = []
 

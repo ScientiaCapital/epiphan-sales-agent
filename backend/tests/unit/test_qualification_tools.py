@@ -358,12 +358,12 @@ class TestClassifyTechStack:
         category, score, _ = classify_tech_stack(None)
         assert score == 5
 
-    def test_clearbit_data_tech_stack_extracted(self):
-        """Should extract tech stack from clearbit data."""
+    def test_enrichment_data_tech_stack_extracted(self):
+        """Should extract tech stack from enrichment data."""
         from app.services.langgraph.tools.qualification_tools import classify_tech_stack
 
-        clearbit_data = {"tech_stack": ["Panopto", "Zoom"]}
-        category, score, _ = classify_tech_stack(None, clearbit_data)
+        enrichment_data = {"tech_stack": ["Panopto", "Zoom"]}
+        category, score, _ = classify_tech_stack(None, enrichment_data)
         assert score == 10
 
 

@@ -1,15 +1,13 @@
 """Tools for Lead Research Agent.
 
 Provides functions to enrich lead data from multiple sources:
-- Apollo.io (contact enrichment)
-- Clearbit (company firmographics)
+- Apollo.io (contact and company enrichment)
 - Web scraping (company website, news)
 """
 
 from typing import Any
 
 from app.services.enrichment.apollo import apollo_client
-from app.services.enrichment.clearbit import clearbit_client
 from app.services.enrichment.scraper import web_scraper
 
 
@@ -24,19 +22,6 @@ async def enrich_from_apollo(email: str) -> dict[str, Any] | None:
         Enriched contact data or None if not found
     """
     return await apollo_client.enrich_contact(email)
-
-
-async def enrich_from_clearbit(domain: str) -> dict[str, Any] | None:
-    """
-    Enrich a company using Clearbit.
-
-    Args:
-        domain: Company domain (e.g., 'company.com')
-
-    Returns:
-        Enriched company data or None if not found
-    """
-    return await clearbit_client.enrich_company(domain)
 
 
 async def scrape_company_website(domain: str) -> dict[str, Any] | None:
@@ -95,18 +80,15 @@ def get_company_domain(email: str) -> str:
 
 def combine_enrichment_data(
     apollo_data: dict[str, Any] | None,
-    clearbit_data: dict[str, Any] | None,
     scraped_data: dict[str, Any] | None,
 ) -> dict[str, Any]:
     """
     Combine enrichment data from multiple sources.
 
-    Prioritizes Apollo for contact info, Clearbit for company,
-    and scraped for context.
+    Prioritizes Apollo for contact/company info, scraped for context.
 
     Args:
         apollo_data: Data from Apollo.io
-        clearbit_data: Data from Clearbit
         scraped_data: Data from web scraping
 
     Returns:
@@ -114,27 +96,22 @@ def combine_enrichment_data(
     """
     result: dict[str, Any] = {}
 
-    # Contact info from Apollo (priority)
+    # Contact and company info from Apollo
     if apollo_data:
-        for key in ["first_name", "last_name", "title", "linkedin_url", "seniority"]:
-            if apollo_data.get(key):
-                result[key] = apollo_data[key]
-
-    # Company info from Clearbit (priority)
-    if clearbit_data:
         for key in [
+            "first_name",
+            "last_name",
+            "title",
+            "linkedin_url",
+            "seniority",
             "industry",
-            "sector",
             "employees",
-            "employees_range",
             "city",
             "state",
             "country",
-            "tech_stack",
-            "linkedin_handle",
         ]:
-            if clearbit_data.get(key):
-                result[key] = clearbit_data[key]
+            if apollo_data.get(key):
+                result[key] = apollo_data[key]
 
     # Context from scraping
     if scraped_data:

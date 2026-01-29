@@ -113,7 +113,6 @@ class TestLeadResearchState:
             "lead": lead,
             "research_depth": "deep",
             "apollo_data": None,
-            "clearbit_data": None,
             "news_articles": [],
             "linkedin_context": None,
             "research_brief": None,

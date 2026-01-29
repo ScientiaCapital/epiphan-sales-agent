@@ -1,6 +1,6 @@
 """Lead Research Agent for enriching and synthesizing lead intelligence.
 
-Orchestrates multiple enrichment sources (Apollo, Clearbit, web scraping)
+Orchestrates multiple enrichment sources (Apollo, web scraping)
 to build comprehensive research briefs for sales outreach.
 """
 
@@ -12,7 +12,6 @@ from app.services.langgraph.states import LeadResearchState, ResearchBrief
 from app.services.langgraph.tools.research_tools import (
     combine_enrichment_data,
     enrich_from_apollo,
-    enrich_from_clearbit,
     get_company_domain,
     scrape_company_news,
     scrape_company_website,
@@ -64,27 +63,17 @@ class LeadResearchAgent:
     async def _enrich_apis_node(
         self, state: LeadResearchState
     ) -> dict[str, Any]:
-        """Run API enrichment in parallel."""
+        """Run API enrichment."""
         lead = state["lead"]
-        domain = get_company_domain(lead.email)
 
-        # Run Apollo and Clearbit in parallel
-        apollo_task = enrich_from_apollo(lead.email)
-        clearbit_task = enrich_from_clearbit(domain)
-
-        apollo_data, clearbit_data = await asyncio.gather(
-            apollo_task, clearbit_task, return_exceptions=True
-        )
-
-        # Handle exceptions
-        if isinstance(apollo_data, Exception):
+        # Enrich from Apollo
+        try:
+            apollo_data = await enrich_from_apollo(lead.email)
+        except Exception:
             apollo_data = None
-        if isinstance(clearbit_data, Exception):
-            clearbit_data = None
 
         return {
             "apollo_data": apollo_data,
-            "clearbit_data": clearbit_data,
         }
 
     async def _scrape_web_node(
@@ -119,14 +108,12 @@ class LeadResearchAgent:
         """Synthesize enrichment data into a research brief."""
         lead = state["lead"]
         apollo_data = state.get("apollo_data")
-        clearbit_data = state.get("clearbit_data")
         news_articles = state.get("news_articles", [])
         linkedin_context = state.get("linkedin_context")
 
         # Combine data from all sources
         combined = combine_enrichment_data(
             apollo_data,
-            clearbit_data,
             {"about_text": linkedin_context} if linkedin_context else None,
         )
 
@@ -141,9 +128,7 @@ class LeadResearchAgent:
         )
 
         # Identify risk factors
-        risk_factors = self._identify_risk_factors(
-            lead, apollo_data, clearbit_data
-        )
+        risk_factors = self._identify_risk_factors(lead, apollo_data)
 
         return {
             "research_brief": research_brief,
@@ -231,7 +216,6 @@ class LeadResearchAgent:
         self,
         lead: Lead,
         apollo_data: dict[str, Any] | None,
-        clearbit_data: dict[str, Any] | None,
     ) -> list[str]:
         """Identify potential risk factors for the deal."""
         risks = []
@@ -240,15 +224,15 @@ class LeadResearchAgent:
         if not apollo_data:
             risks.append("Limited contact information - may need additional research")
 
-        # Company size concerns
-        if clearbit_data:
-            employees = clearbit_data.get("employees", 0)
+        # Company size concerns from Apollo
+        if apollo_data:
+            employees = apollo_data.get("employees", 0)
             if employees and employees < 100:
                 risks.append("Small organization - may have budget constraints")
 
             # Industry mismatch
-            industry = clearbit_data.get("industry", "").lower()
-            if not any(v in industry for v in [
+            industry = apollo_data.get("industry", "").lower()
+            if industry and not any(v in industry for v in [
                 "education", "healthcare", "media", "entertainment",
                 "government", "corporate", "enterprise", "legal"
             ]):
@@ -287,7 +271,6 @@ class LeadResearchAgent:
             "lead": lead,
             "research_depth": research_depth,
             "apollo_data": None,
-            "clearbit_data": None,
             "news_articles": [],
             "linkedin_context": None,
             "research_brief": None,

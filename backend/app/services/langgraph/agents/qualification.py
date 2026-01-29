@@ -19,7 +19,6 @@ Features:
 - Thread ID support for workflow tracking
 """
 
-import asyncio
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Any
@@ -48,8 +47,6 @@ from app.services.langgraph.tools.qualification_tools import (
 )
 from app.services.langgraph.tools.research_tools import (
     enrich_from_apollo,
-    enrich_from_clearbit,
-    get_company_domain,
 )
 from langgraph.graph import END, StateGraph
 
@@ -93,7 +90,7 @@ class QualificationAgent:
         Gather enrichment data for qualification.
 
         If skip_enrichment is True, uses provided data.
-        Otherwise, calls Apollo and Clearbit APIs.
+        Otherwise, calls Apollo API.
         """
         lead = state["lead"]
         skip_enrichment = state.get("skip_enrichment", False)
@@ -102,32 +99,19 @@ class QualificationAgent:
         if skip_enrichment:
             return {
                 "apollo_data": state.get("apollo_data"),
-                "clearbit_data": state.get("clearbit_data"),
             }
 
-        # Get domain from email
-        domain = get_company_domain(lead.email)
-
-        # Run enrichment in parallel
-        apollo_task = enrich_from_apollo(lead.email)
-        clearbit_task = enrich_from_clearbit(domain)
-
-        apollo_data, clearbit_data = await asyncio.gather(
-            apollo_task, clearbit_task, return_exceptions=True
-        )
-
-        # Handle exceptions gracefully
-        if isinstance(apollo_data, Exception):
+        # Run Apollo enrichment
+        try:
+            apollo_data = await enrich_from_apollo(lead.email)
+        except Exception:
             apollo_data = None
-        if isinstance(clearbit_data, Exception):
-            clearbit_data = None
 
         # Try to detect persona from title
         persona_match = self._detect_persona(lead, apollo_data)
 
         return {
             "apollo_data": apollo_data,
-            "clearbit_data": clearbit_data,
             "persona_match": persona_match,
         }
 
@@ -175,16 +159,15 @@ class QualificationAgent:
         """
         lead = state["lead"]
         apollo_data = state.get("apollo_data")
-        clearbit_data = state.get("clearbit_data")
         persona_match = state.get("persona_match")
 
         # Track missing info
         missing_info: list[str] = []
 
-        # 1. Company Size
+        # 1. Company Size (from Apollo)
         employees = None
-        if clearbit_data:
-            employees = clearbit_data.get("employees")
+        if apollo_data:
+            employees = apollo_data.get("employees")
         if employees is None:
             missing_info.append("company_size")
 
@@ -197,10 +180,10 @@ class QualificationAgent:
             "confidence": 1.0 if employees else 0.3,
         }
 
-        # 2. Industry Vertical
+        # 2. Industry Vertical (from Apollo)
         industry = None
-        if clearbit_data:
-            industry = clearbit_data.get("industry")
+        if apollo_data:
+            industry = apollo_data.get("industry")
 
         vert_category, vert_score, vert_reason = classify_vertical(
             industry, lead.company, inferred=None
@@ -221,8 +204,8 @@ class QualificationAgent:
 
         # 3. Use Case Fit
         tech_stack = None
-        if clearbit_data:
-            tech_stack = clearbit_data.get("tech_stack")
+        if apollo_data:
+            tech_stack = apollo_data.get("tech_stack")
 
         use_category, use_score, use_reason = classify_use_case(
             persona=persona_match,
@@ -241,7 +224,7 @@ class QualificationAgent:
 
         # 4. Tech Stack Signals
         tech_category, tech_score, tech_reason = classify_tech_stack(
-            tech_stack, clearbit_data
+            tech_stack, apollo_data
         )
 
         if not tech_stack:
@@ -347,16 +330,13 @@ class QualificationAgent:
     ) -> QualificationState:
         """Prepare initial state for qualification workflow."""
         apollo_data = None
-        clearbit_data = None
         if enrichment_data:
             apollo_data = enrichment_data.get("apollo")
-            clearbit_data = enrichment_data.get("clearbit")
 
         return {
             "lead": lead,
             "skip_enrichment": skip_enrichment,
             "apollo_data": apollo_data,
-            "clearbit_data": clearbit_data,
             "persona_match": None,
             "inferred_company_size": None,
             "inferred_vertical": None,
@@ -395,7 +375,7 @@ class QualificationAgent:
         Args:
             lead: Lead to qualify
             enrichment_data: Optional pre-fetched enrichment data
-                {"apollo": {...}, "clearbit": {...}}
+                {"apollo": {...}}
             skip_enrichment: If True, don't call enrichment APIs
             thread_id: Optional thread ID for checkpointing
             use_checkpointing: If True, enable persistent checkpointing

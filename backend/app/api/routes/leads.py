@@ -140,7 +140,7 @@ class LeadIngestRequest(BaseModel):
     # Enrichment controls
     enrich: bool = Field(
         default=True,
-        description="Call Apollo/Clearbit for full enrichment",
+        description="Call Apollo for full enrichment",
     )
     enrich_phones: bool = Field(
         default=True,
@@ -222,7 +222,7 @@ class LeadIngestResult(BaseModel):
     work_phone: str | None = Field(default=None, description="Office line")
     mobile_phone: str | None = Field(default=None, description="Cell phone")
     company_phone: str | None = Field(default=None, description="Switchboard fallback")
-    phone_source: str | None = Field(default=None, description="Where we got the phone (apollo, clearbit, harvester)")
+    phone_source: str | None = Field(default=None, description="Where we got the phone (apollo, harvester)")
     best_phone: str | None = Field(default=None, description="Best available phone for dialing")
 
 

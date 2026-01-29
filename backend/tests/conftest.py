@@ -170,7 +170,7 @@ def mock_llm_client() -> MagicMock:
 @pytest.fixture
 def mock_enrichment_api() -> MagicMock:
     """
-    Mock external enrichment API (e.g., Clearbit, Apollo).
+    Mock external enrichment API (e.g., Apollo).
 
     External APIs should ALWAYS be mocked in tests because:
     - They might be down

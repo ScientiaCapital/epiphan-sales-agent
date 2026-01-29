@@ -71,24 +71,14 @@ class TestQualificationAgent:
 
         agent = QualificationAgent()
 
-        # Mock enrichment sources
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
             mock_apollo.return_value = {
                 "first_name": "Sarah",
                 "title": "Director of AV Services",
                 "seniority": "director",
-            }
-            mock_clearbit.return_value = {
-                "name": "Stanford University",
                 "industry": "Higher Education",
                 "employees": 15000,
                 "tech_stack": ["Canvas", "Zoom", "Panopto"],
@@ -109,21 +99,13 @@ class TestQualificationAgent:
 
         agent = QualificationAgent()
 
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
             mock_apollo.return_value = {
                 "title": "Director of Media Services",
                 "seniority": "director",
-            }
-            mock_clearbit.return_value = {
                 "industry": "Higher Education",
                 "employees": 12000,
                 "tech_stack": ["Canvas", "Zoom", "Panopto"],
@@ -137,32 +119,18 @@ class TestQualificationAgent:
 
     @pytest.mark.asyncio
     async def test_low_score_lead_disqualified(self, smb_lead: Lead):
-        """Test small company non-ICP lead has low score.
-
-        Scoring: size=0 (5 emp), vertical=3 (Retail), use_case=4 (Specialist),
-        tech=5 (no stack), authority=4 (Specialist).
-        Total: (0*2.5 + 3*2.0 + 4*2.5 + 5*1.5 + 4*1.5) = 0+6+10+7.5+6 = 29.5 ≈ Not ICP
-        But with "IT Specialist" title detecting "video" keywords could boost use_case.
-        """
+        """Test small company non-ICP lead has low score."""
         from app.services.langgraph.agents.qualification import QualificationAgent
 
         agent = QualificationAgent()
 
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
             mock_apollo.return_value = {
                 "title": "IT Specialist",
                 "seniority": "entry",
-            }
-            mock_clearbit.return_value = {
                 "industry": "Retail",
                 "employees": 5,
                 "tech_stack": [],
@@ -181,18 +149,11 @@ class TestQualificationAgent:
 
         agent = QualificationAgent()
 
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
             mock_apollo.return_value = None
-            mock_clearbit.return_value = None
 
             result = await agent.run(sample_lead)
 
@@ -210,33 +171,27 @@ class TestQualificationAgent:
         agent = QualificationAgent()
 
         enrichment_data = {
-            "apollo": {"title": "AV Director", "seniority": "director"},
-            "clearbit": {
+            "apollo": {
+                "title": "AV Director",
+                "seniority": "director",
                 "industry": "Higher Education",
                 "employees": 5000,
                 "tech_stack": ["Canvas"],
             },
         }
 
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
             result = await agent.run(
                 sample_lead,
                 enrichment_data=enrichment_data,
                 skip_enrichment=True,
             )
 
-        # Enrichment APIs should NOT be called
+        # Enrichment API should NOT be called
         mock_apollo.assert_not_called()
-        mock_clearbit.assert_not_called()
 
         # Should still produce valid result
         assert result is not None
@@ -249,18 +204,13 @@ class TestQualificationAgent:
 
         agent = QualificationAgent()
 
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
-            mock_apollo.return_value = {"title": "Director", "seniority": "director"}
-            mock_clearbit.return_value = {
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
+            mock_apollo.return_value = {
+                "title": "Director",
+                "seniority": "director",
                 "industry": "Higher Education",
                 "employees": 5000,
             }
@@ -283,18 +233,12 @@ class TestQualificationAgent:
 
         agent = QualificationAgent()
 
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
-            mock_apollo.return_value = {"seniority": "director"}
-            mock_clearbit.return_value = {
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
+            mock_apollo.return_value = {
+                "seniority": "director",
                 "industry": "Higher Education",
                 "employees": 10000,
                 "tech_stack": ["Panopto"],
@@ -313,18 +257,13 @@ class TestQualificationAgent:
         agent = QualificationAgent()
 
         # First run with complete data
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
-            mock_apollo.return_value = {"title": "Director", "seniority": "director"}
-            mock_clearbit.return_value = {
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
+            mock_apollo.return_value = {
+                "title": "Director",
+                "seniority": "director",
                 "industry": "Higher Education",
                 "employees": 5000,
                 "tech_stack": ["Canvas", "Zoom"],
@@ -333,18 +272,11 @@ class TestQualificationAgent:
             result_complete = await agent.run(sample_lead)
 
         # Second run with sparse data
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
             mock_apollo.return_value = None
-            mock_clearbit.return_value = None
 
             result_sparse = await agent.run(sample_lead)
 
@@ -358,18 +290,12 @@ class TestQualificationAgent:
 
         agent = QualificationAgent()
 
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
-            mock_apollo.return_value = {"title": "AV Director"}
-            mock_clearbit.return_value = {
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
+            mock_apollo.return_value = {
+                "title": "AV Director",
                 "industry": "Higher Education",
                 "employees": 5000,
             }
@@ -387,18 +313,12 @@ class TestQualificationAgent:
 
         agent = QualificationAgent()
 
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
-            mock_apollo.return_value = {"title": "AV Director"}
-            mock_clearbit.return_value = {
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
+            mock_apollo.return_value = {
+                "title": "AV Director",
                 "industry": "Higher Education",
                 "employees": 5000,
                 "tech_stack": ["Panopto", "Canvas", "Zoom"],  # Panopto is competitor
@@ -429,18 +349,11 @@ class TestQualificationAgentEdgeCases:
 
         agent = QualificationAgent()
 
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
             mock_apollo.return_value = None
-            mock_clearbit.return_value = None
 
             result = await agent.run(minimal_lead)
 
@@ -456,18 +369,11 @@ class TestQualificationAgentEdgeCases:
         lead = Lead(hubspot_id="hs-error", email="error@test.com", company="Test Corp")
         agent = QualificationAgent()
 
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
             mock_apollo.side_effect = Exception("Apollo API error")
-            mock_clearbit.side_effect = Exception("Clearbit API error")
 
             result = await agent.run(lead)
 
@@ -488,18 +394,11 @@ class TestQualificationAgentEdgeCases:
         )
         agent = QualificationAgent()
 
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
             mock_apollo.return_value = None
-            mock_clearbit.return_value = None
 
             result = await agent.run(lead)
 
@@ -526,23 +425,14 @@ class TestQualificationAgentIntegration:
         )
         agent = QualificationAgent()
 
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
             mock_apollo.return_value = {
                 "title": "Director of Academic Technology",
                 "seniority": "director",
                 "linkedin_url": "https://linkedin.com/in/jane-director",
-            }
-            mock_clearbit.return_value = {
-                "name": "Stanford University",
                 "industry": "Higher Education",
                 "employees": 16000,
                 "tech_stack": ["Canvas", "Zoom", "Kaltura", "Panopto"],
@@ -560,12 +450,7 @@ class TestQualificationAgentIntegration:
 
     @pytest.mark.asyncio
     async def test_full_qualification_flow_tier_2(self):
-        """Test complete qualification flow for mid-tier lead.
-
-        500 employees (mid-market=8), Corporate Training (corporate=8),
-        IT Manager (influencer=7), Teams/Zoom (LMS=8), title-based use case.
-        This actually scores quite high due to collaboration tools and manager title.
-        """
+        """Test complete qualification flow for mid-tier lead."""
         from app.services.langgraph.agents.qualification import QualificationAgent
 
         lead = Lead(
@@ -578,21 +463,13 @@ class TestQualificationAgentIntegration:
         )
         agent = QualificationAgent()
 
-        with (
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_apollo",
-                new_callable=AsyncMock,
-            ) as mock_apollo,
-            patch(
-                "app.services.langgraph.agents.qualification.enrich_from_clearbit",
-                new_callable=AsyncMock,
-            ) as mock_clearbit,
-        ):
+        with patch(
+            "app.services.langgraph.agents.qualification.enrich_from_apollo",
+            new_callable=AsyncMock,
+        ) as mock_apollo:
             mock_apollo.return_value = {
                 "title": "IT Manager",
                 "seniority": "manager",
-            }
-            mock_clearbit.return_value = {
                 "industry": "Retail",  # Lower scoring vertical
                 "employees": 150,  # Mid-market but lower
                 "tech_stack": ["Salesforce"],  # No video/LMS tools

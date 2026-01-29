@@ -63,30 +63,6 @@ class TestResearchTools:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_enrich_from_clearbit(self):
-        """Test Clearbit company enrichment tool."""
-        from app.services.langgraph.tools.research_tools import enrich_from_clearbit
-
-        mock_result = {
-            "name": "State University",
-            "industry": "Higher Education",
-            "employees": 5000,
-            "tech_stack": ["Canvas", "Workday"],
-        }
-
-        with patch(
-            "app.services.langgraph.tools.research_tools.clearbit_client.enrich_company",
-            new_callable=AsyncMock,
-        ) as mock_enrich:
-            mock_enrich.return_value = mock_result
-
-            result = await enrich_from_clearbit("stateuniversity.edu")
-
-        assert result is not None
-        assert result["industry"] == "Higher Education"
-        assert "Canvas" in result["tech_stack"]
-
-    @pytest.mark.asyncio
     async def test_scrape_company_website(self):
         """Test web scraping tool for company info."""
         from app.services.langgraph.tools.research_tools import scrape_company_website
@@ -155,11 +131,10 @@ class TestResearchTools:
         """Test combining data from multiple sources."""
         from app.services.langgraph.tools.research_tools import combine_enrichment_data
 
-        apollo = {"first_name": "Sarah", "title": "AV Director"}
-        clearbit = {"industry": "Higher Education", "employees": 5000}
+        apollo = {"first_name": "Sarah", "title": "AV Director", "industry": "Higher Education"}
         scraped = {"about_text": "Leading institution..."}
 
-        result = combine_enrichment_data(apollo, clearbit, scraped)
+        result = combine_enrichment_data(apollo, scraped)
 
         assert result["first_name"] == "Sarah"
         assert result["industry"] == "Higher Education"

@@ -113,7 +113,7 @@ class ResearchBrief(TypedDict):
 class LeadResearchState(TypedDict):
     """State for Lead Research Agent.
 
-    Flow: enrich_apis (parallel) → scrape_web → synthesize → format_brief
+    Flow: enrich_apis → scrape_web → synthesize → format_brief
     """
 
     # Inputs
@@ -122,7 +122,6 @@ class LeadResearchState(TypedDict):
 
     # Tool outputs
     apollo_data: dict[str, Any] | None
-    clearbit_data: dict[str, Any] | None
     news_articles: list[dict[str, Any]]
     linkedin_context: str | None
 
@@ -174,7 +173,6 @@ class QualificationState(TypedDict):
 
     # Enrichment data (from research agent or provided)
     apollo_data: dict[str, Any] | None
-    clearbit_data: dict[str, Any] | None
     persona_match: str | None
 
     # Inference results (when data is missing)
