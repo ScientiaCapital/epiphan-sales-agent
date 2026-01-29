@@ -12,6 +12,12 @@ from app.services.langgraph.tools.email_tools import (
     get_email_template,
     get_pain_points_for_persona,
 )
+from app.services.langgraph.tools.harvester_mapper import (
+    enrich_phone_numbers,
+    get_best_phone,
+    map_harvester_tier_to_score,
+    map_harvester_to_lead,
+)
 from app.services.langgraph.tools.research_tools import (
     combine_enrichment_data,
     enrich_from_apollo,
@@ -48,4 +54,9 @@ __all__ = [
     "get_pain_points_for_persona",
     "build_email_prompt",
     "get_cta_for_sequence_step",
+    # Harvester mapper tools
+    "map_harvester_to_lead",
+    "map_harvester_tier_to_score",
+    "enrich_phone_numbers",
+    "get_best_phone",
 ]
