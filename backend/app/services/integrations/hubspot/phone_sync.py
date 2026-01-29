@@ -7,8 +7,11 @@ HubSpot phone properties:
 - phone: Primary phone (we use best available: direct > mobile > work)
 - mobilephone: Mobile number specifically
 - apollo_direct_dial: Custom property for direct dial (create in HubSpot first)
+
+Note: HubSpot SDK is synchronous, so we use asyncio.to_thread() to avoid blocking.
 """
 
+import asyncio
 import logging
 from typing import Any
 
@@ -18,6 +21,40 @@ from hubspot.crm.contacts import SimplePublicObjectInput
 from hubspot.crm.contacts.exceptions import ApiException
 
 logger = logging.getLogger(__name__)
+
+
+def _sync_hubspot_search(client: HubSpot, email: str) -> str | None:
+    """Synchronous HubSpot search - called via asyncio.to_thread()."""
+    search_response = client.crm.contacts.search_api.do_search(
+        public_object_search_request={
+            "filterGroups": [
+                {
+                    "filters": [
+                        {
+                            "propertyName": "email",
+                            "operator": "EQ",
+                            "value": email,
+                        }
+                    ]
+                }
+            ],
+            "limit": 1,
+        }
+    )
+    if search_response.results:
+        return search_response.results[0].id
+    return None
+
+
+def _sync_hubspot_update(
+    client: HubSpot, contact_id: str, properties: dict[str, Any]
+) -> bool:
+    """Synchronous HubSpot update - called via asyncio.to_thread()."""
+    client.crm.contacts.basic_api.update(
+        contact_id=contact_id,
+        simple_public_object_input=SimplePublicObjectInput(properties=properties),
+    )
+    return True
 
 
 async def sync_phones_to_hubspot(
@@ -57,30 +94,13 @@ async def sync_phones_to_hubspot(
 
     client = HubSpot(access_token=settings.hubspot_access_token)
 
-    # Find contact by email
+    # Find contact by email (use asyncio.to_thread to avoid blocking)
     try:
-        search_response = client.crm.contacts.search_api.do_search(
-            public_object_search_request={
-                "filterGroups": [
-                    {
-                        "filters": [
-                            {
-                                "propertyName": "email",
-                                "operator": "EQ",
-                                "value": email,
-                            }
-                        ]
-                    }
-                ],
-                "limit": 1,
-            }
-        )
+        contact_id = await asyncio.to_thread(_sync_hubspot_search, client, email)
 
-        if not search_response.results:
+        if not contact_id:
             logger.info(f"No HubSpot contact found for {email}")
             return False
-
-        contact_id = search_response.results[0].id
 
     except ApiException as e:
         logger.error(f"HubSpot search failed for {email}: {e}")
@@ -108,12 +128,9 @@ async def sync_phones_to_hubspot(
         logger.debug(f"No phone properties to update for {email}")
         return True
 
-    # Update contact
+    # Update contact (use asyncio.to_thread to avoid blocking)
     try:
-        client.crm.contacts.basic_api.update(
-            contact_id=contact_id,
-            simple_public_object_input=SimplePublicObjectInput(properties=properties),
-        )
+        await asyncio.to_thread(_sync_hubspot_update, client, contact_id, properties)
         logger.info(
             f"PHONES ARE GOLD! Updated HubSpot contact {contact_id} ({email}) "
             f"with phones: {list(properties.keys())}"
@@ -132,11 +149,8 @@ async def sync_phones_to_hubspot(
             properties.pop("apollo_direct_dial", None)
             if properties:
                 try:
-                    client.crm.contacts.basic_api.update(
-                        contact_id=contact_id,
-                        simple_public_object_input=SimplePublicObjectInput(
-                            properties=properties
-                        ),
+                    await asyncio.to_thread(
+                        _sync_hubspot_update, client, contact_id, properties
                     )
                     logger.info(
                         f"Updated HubSpot contact {contact_id} ({email}) "

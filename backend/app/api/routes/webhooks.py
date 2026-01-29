@@ -130,39 +130,63 @@ def extract_phones_from_payload(
     return result
 
 
-async def update_lead_phones(email: str, phone_numbers: list[dict[str, Any]]) -> bool:
+async def update_lead_phones(
+    email: str,
+    person_id: str | None,
+    phone_numbers: list[dict[str, Any]],
+) -> bool:
     """
-    Update lead record with phone numbers from webhook.
+    Store phone numbers from webhook LOCALLY (not to HubSpot yet).
 
-    PHONES ARE GOLD! This function processes async phone delivery and
-    stores the numbers for BDR outreach.
+    PHONES ARE GOLD! This stores phones in apollo_phone_webhooks table
+    with synced_to_hubspot=FALSE. HubSpot sync requires explicit approval.
+
+    Flow:
+    1. Apollo webhook delivers phones
+    2. Store locally (this function)
+    3. Admin reviews pending phones
+    4. Admin approves → sync to HubSpot
 
     Args:
         email: Lead email address
+        person_id: Apollo person ID
         phone_numbers: List of phone objects from Apollo
 
     Returns:
-        True if lead was found and updated
+        True if stored successfully
     """
     phones = extract_phones_from_payload(phone_numbers)
 
     # Log the phones we received - PHONES ARE GOLD!
     logger.info(
-        f"Processing phones for {email}: "
+        f"Storing phones for {email}: "
         f"direct={phones['direct_phone']}, "
         f"mobile={phones['mobile_phone']}, "
         f"work={phones['work_phone']}"
     )
 
-    # TODO: Implement database storage
-    # This requires the apollo_phone_webhooks table from migration 003
-    # For now, we log and return success
+    # Store LOCALLY - NOT synced to HubSpot until approved
+    try:
+        from app.services.database.supabase_client import supabase_client
 
-    # TODO: Sync to HubSpot
-    # from app.services.integrations.hubspot.phone_sync import sync_phones_to_hubspot
-    # await sync_phones_to_hubspot(email, phones["direct_phone"], phones["mobile_phone"], phones["work_phone"])
+        supabase_client.store_apollo_phone_webhook(
+            email=email,
+            person_id=person_id,
+            direct_phone=phones["direct_phone"],
+            mobile_phone=phones["mobile_phone"],
+            work_phone=phones["work_phone"],
+            raw_phones=phone_numbers,
+        )
+        logger.info(f"Phones stored locally for {email} (pending HubSpot approval)")
+        return True
 
-    return True
+    except ValueError as e:
+        # Supabase not configured - log warning but don't fail webhook
+        logger.warning(f"Supabase not configured, phones logged but not persisted: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to store phones for {email}: {e}")
+        return False
 
 
 @router.post("/apollo/phone-reveal", response_model=WebhookResponse)
@@ -218,11 +242,196 @@ async def apollo_phone_webhook(request: Request) -> WebhookResponse:
         f"PHONES ARE GOLD! Received {len(phone_numbers)} phones for {email}: {phone_types}"
     )
 
-    # Update lead record with new phones
-    lead_updated = await update_lead_phones(email, phone_numbers)
+    # Store phones LOCALLY (not to HubSpot until approved)
+    lead_updated = await update_lead_phones(email, payload.person_id, phone_numbers)
 
     return WebhookResponse(
         status="processed",
         phones_received=len(phone_numbers),
         lead_updated=lead_updated,
+    )
+
+
+# =============================================================================
+# HubSpot Sync Approval Endpoints
+# =============================================================================
+
+
+class PendingPhoneRecord(BaseModel):
+    """Phone record pending HubSpot sync approval."""
+
+    id: int
+    email: str
+    person_id: str | None = None
+    direct_phone: str | None = None
+    mobile_phone: str | None = None
+    work_phone: str | None = None
+    received_at: str
+    synced_to_hubspot: bool = False
+
+
+class PendingPhonesResponse(BaseModel):
+    """Response with pending phone records."""
+
+    pending_count: int
+    phones: list[PendingPhoneRecord]
+
+
+class SyncApprovalRequest(BaseModel):
+    """Request to approve HubSpot sync for specific phone records."""
+
+    phone_ids: list[int]
+
+
+class SyncResult(BaseModel):
+    """Result of a single phone sync."""
+
+    phone_id: int
+    email: str
+    success: bool
+    error: str | None = None
+
+
+class SyncApprovalResponse(BaseModel):
+    """Response after approving HubSpot sync."""
+
+    approved_count: int
+    synced_count: int
+    failed_count: int
+    results: list[SyncResult]
+
+
+@router.get("/phones/pending", response_model=PendingPhonesResponse)
+async def get_pending_phones() -> PendingPhonesResponse:
+    """
+    Get phone records pending HubSpot sync approval.
+
+    PHONES ARE GOLD! This shows phones received via Apollo webhook
+    that have NOT been synced to HubSpot yet.
+
+    Use POST /phones/approve to sync selected records to HubSpot.
+
+    Returns:
+        List of pending phone records with their details
+    """
+    try:
+        from app.services.database.supabase_client import supabase_client
+
+        pending = supabase_client.get_unsynced_phones(limit=100)
+
+        phones = [
+            PendingPhoneRecord(
+                id=p["id"],
+                email=p["email"],
+                person_id=p.get("person_id"),
+                direct_phone=p.get("direct_phone"),
+                mobile_phone=p.get("mobile_phone"),
+                work_phone=p.get("work_phone"),
+                received_at=p.get("received_at", ""),
+                synced_to_hubspot=p.get("synced_to_hubspot", False),
+            )
+            for p in pending
+        ]
+
+        return PendingPhonesResponse(
+            pending_count=len(phones),
+            phones=phones,
+        )
+
+    except ValueError as e:
+        logger.warning(f"Supabase not configured: {e}")
+        return PendingPhonesResponse(pending_count=0, phones=[])
+
+
+@router.post("/phones/approve", response_model=SyncApprovalResponse)
+async def approve_hubspot_sync(request: SyncApprovalRequest) -> SyncApprovalResponse:
+    """
+    Approve and sync selected phone records to HubSpot.
+
+    PHONES ARE GOLD! This syncs locally-stored phones to HubSpot CRM.
+    Only approved records are synced - this prevents accidental data push.
+
+    Args:
+        request: List of phone_ids to approve and sync
+
+    Returns:
+        Sync results for each record
+    """
+    from app.services.database.supabase_client import supabase_client
+    from app.services.integrations.hubspot.phone_sync import sync_phones_to_hubspot
+
+    results: list[SyncResult] = []
+    synced_count = 0
+    failed_count = 0
+
+    for phone_id in request.phone_ids:
+        try:
+            # Get the phone record
+            phone_records = supabase_client.client.table("apollo_phone_webhooks").select("*").eq("id", phone_id).execute()
+
+            if not phone_records.data:
+                results.append(SyncResult(
+                    phone_id=phone_id,
+                    email="unknown",
+                    success=False,
+                    error="Record not found",
+                ))
+                failed_count += 1
+                continue
+
+            record = phone_records.data[0]
+            email = record["email"]
+
+            # Skip if already synced
+            if record.get("synced_to_hubspot"):
+                results.append(SyncResult(
+                    phone_id=phone_id,
+                    email=email,
+                    success=True,
+                    error="Already synced",
+                ))
+                continue
+
+            # Sync to HubSpot
+            sync_success = await sync_phones_to_hubspot(
+                email=email,
+                direct_phone=record.get("direct_phone"),
+                mobile_phone=record.get("mobile_phone"),
+                work_phone=record.get("work_phone"),
+            )
+
+            if sync_success:
+                # Mark as synced in local DB
+                supabase_client.mark_phone_synced(phone_id)
+                synced_count += 1
+                results.append(SyncResult(
+                    phone_id=phone_id,
+                    email=email,
+                    success=True,
+                ))
+                logger.info(f"Synced phones to HubSpot for {email}")
+            else:
+                failed_count += 1
+                results.append(SyncResult(
+                    phone_id=phone_id,
+                    email=email,
+                    success=False,
+                    error="HubSpot sync failed",
+                ))
+
+        except Exception as e:
+            failed_count += 1
+            results.append(SyncResult(
+                phone_id=phone_id,
+                email="unknown",
+                success=False,
+                error=str(e),
+            ))
+            logger.error(f"Failed to sync phone {phone_id}: {e}")
+
+    return SyncApprovalResponse(
+        approved_count=len(request.phone_ids),
+        synced_count=synced_count,
+        failed_count=failed_count,
+        results=results,
     )

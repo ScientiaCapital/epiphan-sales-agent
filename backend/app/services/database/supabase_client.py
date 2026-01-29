@@ -227,6 +227,119 @@ class SupabaseClient:
         return result.count or 0
 
     # =========================================================================
+    # Phone Webhook Storage (PHONES ARE GOLD!)
+    # =========================================================================
+
+    def store_apollo_phone_webhook(
+        self,
+        email: str,
+        person_id: str | None,
+        direct_phone: str | None,
+        mobile_phone: str | None,
+        work_phone: str | None,
+        raw_phones: list[dict[str, Any]],
+        lead_id: int | None = None,
+    ) -> dict[str, Any]:
+        """
+        Store phone data from Apollo webhook LOCALLY before HubSpot sync.
+
+        PHONES ARE GOLD! This stores phones locally with synced_to_hubspot=FALSE.
+        HubSpot sync requires explicit approval via sync_phone_to_hubspot().
+
+        Args:
+            email: Contact email (primary identifier)
+            person_id: Apollo person ID
+            direct_phone: Direct dial number (BEST)
+            mobile_phone: Mobile number (GOOD)
+            work_phone: Work line (OK)
+            raw_phones: Raw phone array from Apollo for audit
+            lead_id: Optional link to leads table
+
+        Returns:
+            Inserted record
+        """
+        import json
+
+        result = (
+            self.client.table("apollo_phone_webhooks")
+            .insert({
+                "email": email,
+                "person_id": person_id,
+                "direct_phone": direct_phone,
+                "mobile_phone": mobile_phone,
+                "work_phone": work_phone,
+                "raw_phones": json.dumps(raw_phones),
+                "lead_id": lead_id,
+                "synced_to_hubspot": False,  # NOT synced until approved
+            })
+            .execute()
+        )
+        return result.data[0] if result.data else {}
+
+    def get_unsynced_phones(self, limit: int = 100) -> list[dict[str, Any]]:
+        """
+        Get phone records pending HubSpot sync approval.
+
+        Returns:
+            List of phone records with synced_to_hubspot=FALSE
+        """
+        result = (
+            self.client.table("apollo_phone_webhooks")
+            .select("*")
+            .eq("synced_to_hubspot", False)
+            .order("received_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data or []
+
+    def mark_phone_synced(self, phone_id: int) -> dict[str, Any]:
+        """
+        Mark a phone record as synced to HubSpot.
+
+        Called AFTER successful HubSpot API call.
+
+        Args:
+            phone_id: ID of apollo_phone_webhooks record
+
+        Returns:
+            Updated record
+        """
+        from datetime import datetime, timezone
+
+        result = (
+            self.client.table("apollo_phone_webhooks")
+            .update({
+                "synced_to_hubspot": True,
+                "synced_at": datetime.now(timezone.utc).isoformat(),
+            })
+            .eq("id", phone_id)
+            .execute()
+        )
+        return result.data[0] if result.data else {}
+
+    def get_phones_by_email(self, email: str) -> list[dict[str, Any]]:
+        """
+        Get all phone records for an email.
+
+        Useful for checking if we already have phones before re-enriching.
+
+        Args:
+            email: Contact email
+
+        Returns:
+            List of phone records (may have multiple from different webhooks)
+        """
+        result = (
+            self.client.table("apollo_phone_webhooks")
+            .select("*")
+            .eq("email", email)
+            .order("received_at", desc=True)
+            .execute()
+        )
+        return result.data or []
+
+    # =========================================================================
     # Outreach Operations (for Phase 2)
     # =========================================================================
 
