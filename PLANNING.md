@@ -3,57 +3,77 @@
 ## System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Frontend (TBD)                        │
-└─────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────┐
-│                  FastAPI Backend                         │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
-│  │   Scripts   │  │   HubSpot   │  │    Clari    │     │
-│  │    API      │  │   Client    │  │   Client    │     │
-│  └─────────────┘  └─────────────┘  └─────────────┘     │
-└─────────────────────────────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────┐
-│                    Supabase                              │
-│              (PostgreSQL + Auth)                         │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    Frontend (TBD)                                │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     FastAPI Backend                              │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │ Routes: agents, batch, leads, monitoring, scripts,       │  │
+│  │         webhooks, personas, competitors                   │  │
+│  └──────────────────────────────────────────────────────────┘  │
+│  ┌───────────────┐  ┌───────────────┐  ┌────────────────────┐  │
+│  │  LangGraph    │  │  Enrichment   │  │   Integrations     │  │
+│  │  5 Agents     │  │  Apollo/      │  │   HubSpot/Clari    │  │
+│  │               │  │  Clearbit     │  │                    │  │
+│  └───────────────┘  └───────────────┘  └────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        Supabase                                  │
+│              (PostgreSQL + Auth + Phone Storage)                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## ACQP Framework (Warm Call Scripts)
+## API Endpoints (Implemented)
 
-Each persona script follows the ACQP structure:
-- **Acknowledge**: Greeting + reference to their action
-- **Connect**: Pain point that resonates with their role
-- **Qualify**: Discovery question to gauge fit
-- **Propose**: Value prop with reference customer
+### LangGraph Agents
+- `POST /api/agents/research` - Lead research
+- `POST /api/agents/scripts` - Script selection
+- `POST /api/agents/competitors` - Competitor intel
+- `POST /api/agents/emails` - Email generation
+- `POST /api/agents/emails/with-approval` - Email with HITL
+- `POST /api/agents/qualify` - Lead qualification
+- `POST /api/agents/qualify/stream` - Streaming qualification
 
-## Planned API Endpoints
+### Lead Management
+- `POST /api/leads/ingest` - Harvester batch ingest
+- `POST /api/leads/sync` - HubSpot sync
+- `POST /api/leads/score` - Score unscored leads
+- `GET /api/leads/prioritized` - Get by tier/persona
+- `GET /api/leads/{id}` - Single lead
 
-### Implemented
-- None yet exposed via API
+### Monitoring & Webhooks
+- `GET /api/monitoring/credits` - Credit usage
+- `GET /api/monitoring/rate-limits` - API health
+- `GET /api/monitoring/batches` - Batch list
+- `GET /api/monitoring/batches/{id}` - Batch status
+- `POST /api/webhooks/apollo/phone-reveal` - Apollo phones
+- `POST /api/webhooks/harvester/lead-push` - Harvester sync
+- `GET /api/webhooks/phones/pending` - Pending approvals
+- `POST /api/webhooks/phones/approve` - Approve sync
 
-### Planned
-- `GET /api/scripts/warm` - Get warm call script by trigger/persona
-- `GET /api/leads/{id}` - Get lead details from HubSpot
-- `POST /api/calls/log` - Log call outcome
+### Scripts & Reference
+- `GET /api/scripts/warm/{trigger}` - Warm scripts
+- `GET /api/personas` - Persona list
+- `GET /api/competitors/{name}` - Battlecards
 
 ## Design Decisions
 
-### 1. Script Lookup Strategy
-- Persona + Trigger → Persona-specific script
-- Trigger only → Generic trigger script
-- Neither → Return None (404)
+### 1. Tiered Enrichment Strategy
+- Phase 1 (1 credit): Basic enrichment for all leads
+- Phase 2 (8 credits): Phone reveal ONLY for ATL decision-makers
+- ~67% credit savings on typical batches
 
-### 2. CRM Integration
-- HubSpot as primary CRM
-- Clari for call intelligence (optional)
-- Async clients for non-blocking I/O
+### 2. Async Phone Delivery
+- Apollo phones delivered via webhook (2-10 min delay)
+- Local storage first, HubSpot sync requires approval
+- HMAC-SHA256 verification for security
 
-### 3. Data Storage
-- Scripts stored as Python data structures (not DB)
-- Lead/call data in Supabase
-- Secrets in .env (not committed)
+### 3. Background Processing
+- Harvester leads processed asynchronously
+- In-memory batch tracking (MVP)
+- Integration with monitoring endpoints

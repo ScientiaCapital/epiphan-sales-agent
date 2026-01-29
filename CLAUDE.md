@@ -57,8 +57,10 @@ backend/
 │   ├── api/routes/
 │   │   ├── agents.py        # LangGraph agent endpoints
 │   │   ├── batch.py         # Batch processing endpoint
+│   │   ├── monitoring.py    # Observability (credits, rate-limits, batches)
 │   │   ├── scripts.py       # Script endpoints
-│   │   └── leads.py         # Lead scoring endpoints
+│   │   ├── leads.py         # Lead scoring endpoints
+│   │   └── webhooks.py      # Apollo & Harvester webhooks
 │   ├── data/
 │   │   ├── schemas.py       # Pydantic models
 │   │   ├── scripts.py       # Script lookup functions
@@ -69,6 +71,7 @@ backend/
 │       │   ├── apollo.py    # Apollo.io API
 │       │   ├── audit.py     # Enrichment audit logging & HubSpot mapping
 │       │   ├── clearbit.py  # Clearbit API
+│       │   ├── pipeline.py  # Background processing pipeline
 │       │   └── scraper.py   # Web scraping
 │       ├── scoring/         # Lead scoring services
 │       │   └── atl_detector.py  # ATL decision-maker detection (8 personas)
@@ -81,7 +84,7 @@ backend/
 │       └── integrations/
 │           └── hubspot/     # HubSpot CRM client
 ├── tests/
-│   ├── unit/                # Unit tests (623+)
+│   ├── unit/                # Unit tests (676+)
 │   └── integration/         # Integration tests
 └── pyproject.toml
 ```
@@ -123,6 +126,20 @@ Five AI agents powered by LangGraph + Claude/Cerebras:
 **Tier Thresholds**: Tier 1 (70+), Tier 2 (50-69), Tier 3 (30-49), Not ICP (<30)
 
 ## API Endpoints
+
+### Monitoring & Observability
+- `GET /api/monitoring/credits` - Track Apollo credit usage and savings
+- `GET /api/monitoring/rate-limits` - API health and backoff status
+- `GET /api/monitoring/batches` - List active/completed batches
+- `GET /api/monitoring/batches/{id}` - Detailed batch status
+
+### Webhooks
+- `POST /api/webhooks/apollo/phone-reveal` - Apollo async phone delivery
+- `POST /api/webhooks/harvester/lead-push` - Real-time Harvester sync
+- `GET /api/webhooks/phones/pending` - Pending phone approvals
+- `POST /api/webhooks/phones/approve` - Approve HubSpot sync
+
+### LangGraph Agents
 - `POST /api/agents/research` - Research a lead
 - `POST /api/agents/scripts` - Get personalized script
 - `POST /api/agents/competitors` - Get competitor intel
@@ -131,8 +148,12 @@ Five AI agents powered by LangGraph + Claude/Cerebras:
 - `POST /api/agents/emails/approve/{thread_id}` - Approve/reject pending email
 - `POST /api/agents/qualify` - Qualify lead against ICP criteria
 - `POST /api/agents/qualify/stream` - Qualify with streaming progress (SSE)
+
+### Lead Management
 - `POST /api/batch/process` - Process multiple leads
 - `POST /api/leads/ingest` - Ingest leads from Lead Harvester (with phone enrichment)
+- `POST /api/leads/sync` - HubSpot sync
+- `GET /api/leads/prioritized` - Get leads by tier/persona
 
 ## Known Issues
 - mypy errors (missing type stubs for fastapi, hubspot)
@@ -217,7 +238,21 @@ API Request → Immediate: employer phone only
 
 ---
 
-## Recent Work (2025-01-29)
+## Recent Work (2025-01-29) - Session 2
+- **Observability Endpoints** (COMMITTED: ae6d025)
+  - `GET /api/monitoring/credits` - Track Apollo credit usage and savings
+  - `GET /api/monitoring/rate-limits` - API health and backoff status
+  - `GET /api/monitoring/batches/{id}` - Batch status tracking
+  - In-memory batch tracking with BatchAuditSummary integration
+- **Real-time Harvester Sync** (COMMITTED: ae6d025)
+  - `POST /api/webhooks/harvester/lead-push` - Webhook endpoint
+  - Background processing pipeline (`pipeline.py`)
+  - HMAC-SHA256 signature verification
+  - Config: `HARVESTER_WEBHOOK_SECRET`
+- 46 new tests (21 monitoring + 16 webhook + 9 pipeline)
+- 676 tests passing, 0 lint errors
+
+## Previous Work (2025-01-29) - Session 1
 - **Tiered Apollo Enrichment** (COMMITTED: 03aef3f)
   - ATL decision-maker detector with 8 personas, 40 title variations
   - Two-phase enrichment: 1 credit basic, +8 only for ATL
@@ -242,14 +277,12 @@ API Request → Immediate: employer phone only
   - Streaming progress via SSE (`/api/agents/qualify/stream`)
   - New endpoints: `/api/agents/emails/with-approval`, `/api/agents/emails/approve/{thread_id}`
 - SQL migrations: `001_add_checkpoints.sql`, `002_add_semantic_store.sql`
-- 463 tests passing, 0 lint errors
 
 ## Previous Work (2025-01-28)
 - Implemented Qualification Agent with 5-dimension ICP scoring
 - Added qualification_tools.py with Tim's weighted scoring criteria
 - New `/api/agents/qualify` endpoint for lead qualification
 - 76 new tests for qualification (60 tools + 16 agent)
-- 416 tests passing, 0 lint errors
 
 ## Earlier Work (2025-01-27)
 - Implemented 4 LangGraph agents (Lead Research, Script Selection, Competitor Intel, Email Personalization)
