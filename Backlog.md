@@ -47,5 +47,8 @@
 - [x] Background processing pipeline
 
 ### Testing (DONE)
-- [x] 676 unit tests passing
+- [x] 662 unit tests passing
 - [x] Comprehensive test coverage for all new features
+
+### Cleanup (DONE)
+- [x] Removed Clearbit enrichment (consolidated to Apollo-only)
