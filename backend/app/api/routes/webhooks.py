@@ -435,3 +435,183 @@ async def approve_hubspot_sync(request: SyncApprovalRequest) -> SyncApprovalResp
         failed_count=failed_count,
         results=results,
     )
+
+
+# =============================================================================
+# Lead Harvester Webhook - Real-time Sync
+# =============================================================================
+
+
+class HarvesterLeadPayload(BaseModel):
+    """Single lead from Harvester webhook push."""
+
+    external_id: str
+    source: str = "harvester"
+    company_name: str
+    industry: str | None = None
+    employees: int | None = None
+    city: str | None = None
+    state: str | None = None
+    zip: str | None = None
+    website: str | None = None
+    harvester_score: float | None = None
+    harvester_tier: str | None = None
+    contact_name: str | None = None
+    contact_title: str | None = None
+    contact_email: str | None = None
+    direct_phone: str | None = None
+    work_phone: str | None = None
+    mobile_phone: str | None = None
+    company_phone: str | None = None
+    tech_stack: list[str] | None = None
+    raw_data: dict[str, Any] | None = None
+
+
+class HarvesterPushPayload(BaseModel):
+    """Payload from Lead Harvester webhook push."""
+
+    source: str = "harvester"
+    timestamp: str | None = None
+    leads: list[HarvesterLeadPayload]
+
+
+class HarvesterPushResponse(BaseModel):
+    """Response to Harvester webhook push."""
+
+    status: str  # "accepted" | "rejected"
+    leads_received: int
+    batch_id: str  # For tracking via /api/monitoring/batches/{id}
+    message: str
+
+
+def verify_harvester_signature(body: bytes, signature: str | None) -> bool:
+    """
+    Verify Lead Harvester webhook signature using HMAC-SHA256.
+
+    Follows same pattern as Apollo verification for consistency.
+
+    Args:
+        body: Raw request body bytes
+        signature: Signature from x-harvester-signature header
+
+    Returns:
+        True if signature is valid, False otherwise
+    """
+    if not settings.harvester_webhook_secret:
+        # No secret configured - allow in development, warn in production
+        if settings.environment == "production":
+            logger.warning("Harvester webhook secret not configured in production!")
+            return False
+        logger.debug("Harvester signature skipped (dev mode, no secret configured)")
+        return True
+
+    if not signature:
+        logger.warning("Missing x-harvester-signature header")
+        return False
+
+    expected = hmac.new(
+        settings.harvester_webhook_secret.encode(),
+        body,
+        hashlib.sha256,
+    ).hexdigest()
+
+    # Handle both with and without prefix
+    sig_to_check = signature
+    if signature.startswith("sha256="):
+        sig_to_check = signature[7:]
+
+    return hmac.compare_digest(sig_to_check, expected)
+
+
+@router.post("/harvester/lead-push", response_model=HarvesterPushResponse)
+async def harvester_lead_push(request: Request) -> HarvesterPushResponse:
+    """
+    Receive real-time lead push from Lead Harvester.
+
+    This endpoint enables automatic lead flow from Harvester without manual CSV exports.
+    Leads are validated, stored, and queued for background enrichment/qualification.
+
+    Security:
+    - HMAC-SHA256 signature validation (set HARVESTER_WEBHOOK_SECRET in production)
+    - Signature check is enforced in production, permissive in development
+
+    Processing:
+    1. Validate webhook signature
+    2. Parse and validate lead payload
+    3. Store raw leads to Supabase (if configured)
+    4. Queue background enrichment/qualification
+    5. Return batch_id for tracking via /api/monitoring/batches/{id}
+
+    Returns:
+        HarvesterPushResponse with status and batch_id for tracking
+    """
+    from datetime import datetime, timezone
+
+    from app.api.routes.monitoring import register_batch
+    from app.services.enrichment.pipeline import queue_harvester_batch
+
+    # Get raw body for signature verification
+    body = await request.body()
+    signature = request.headers.get("x-harvester-signature")
+
+    # Verify signature
+    if not verify_harvester_signature(body, signature):
+        logger.warning("Invalid Harvester webhook signature")
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+    # Parse payload
+    try:
+        payload = HarvesterPushPayload(**(await request.json()))
+    except Exception as e:
+        logger.error(f"Failed to parse Harvester webhook payload: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid payload format: {e}") from e
+
+    # Validate we have leads
+    if not payload.leads:
+        return HarvesterPushResponse(
+            status="accepted",
+            leads_received=0,
+            batch_id="",
+            message="No leads in payload",
+        )
+
+    # Generate batch ID
+    timestamp = payload.timestamp or datetime.now(timezone.utc).isoformat()
+    batch_id = f"harv_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{len(payload.leads)}"
+
+    # Register batch for monitoring
+    register_batch(batch_id, len(payload.leads))
+
+    # Log the push
+    logger.info(
+        f"Harvester push received: {len(payload.leads)} leads, batch_id={batch_id}",
+        extra={
+            "batch_id": batch_id,
+            "source": payload.source,
+            "lead_count": len(payload.leads),
+            "timestamp": timestamp,
+        },
+    )
+
+    # Queue for background processing (non-blocking)
+    try:
+        await queue_harvester_batch(
+            batch_id=batch_id,
+            leads=[lead.model_dump() for lead in payload.leads],
+        )
+    except Exception as e:
+        logger.error(f"Failed to queue Harvester batch: {e}")
+        # Still return accepted - we can retry from stored data
+        return HarvesterPushResponse(
+            status="accepted",
+            leads_received=len(payload.leads),
+            batch_id=batch_id,
+            message=f"Leads received but queue failed: {e}. Check batch status for retry.",
+        )
+
+    return HarvesterPushResponse(
+        status="accepted",
+        leads_received=len(payload.leads),
+        batch_id=batch_id,
+        message=f"Leads queued for processing. Track at /api/monitoring/batches/{batch_id}",
+    )

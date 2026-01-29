@@ -109,6 +109,12 @@ class Settings(BaseSettings):
         "Example: https://api.yourdomain.com/api/webhooks/apollo/phone-reveal"
     )
 
+    # Lead Harvester Webhooks (Real-time sync)
+    harvester_webhook_secret: str = Field(
+        default="",
+        description="HMAC-SHA256 secret for validating Lead Harvester webhook signatures"
+    )
+
     # Monitoring
     langchain_tracing_v2: bool = False
     langchain_api_key: str = Field(default="")

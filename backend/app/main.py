@@ -9,6 +9,7 @@ from app.api.routes.agents import router as agents_router
 from app.api.routes.batch import router as batch_router
 from app.api.routes.competitors import router as competitors_router
 from app.api.routes.leads import router as leads_router
+from app.api.routes.monitoring import router as monitoring_router
 from app.api.routes.personas import router as personas_router
 from app.api.routes.scripts import router as scripts_router
 from app.api.routes.webhooks import router as webhooks_router
@@ -73,3 +74,4 @@ app.include_router(leads_router, prefix="/api", tags=["leads"])
 app.include_router(agents_router)  # Already has /api/agents prefix
 app.include_router(batch_router)  # Already has /api/batch prefix
 app.include_router(webhooks_router)  # Already has /api/webhooks prefix - PHONES ARE GOLD!
+app.include_router(monitoring_router)  # Already has /api/monitoring prefix - Track the gold spend!
