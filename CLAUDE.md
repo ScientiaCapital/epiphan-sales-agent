@@ -183,9 +183,16 @@ API Request → Immediate: employer phone only
 ### Implementation Status
 - ✅ `apollo.py` has `reveal_phone_number=true` by default
 - ✅ `webhook_url` parameter supported
-- ⚠️ **TODO**: Implement webhook endpoint (`/api/webhooks/apollo/phone-reveal`)
-- ⚠️ **TODO**: Add `APOLLO_WEBHOOK_URL` to config
-- ⚠️ **TODO**: Update lead records when webhook receives phones
+- ✅ Webhook endpoint: `POST /api/webhooks/apollo/phone-reveal`
+- ✅ Config: `APOLLO_WEBHOOK_URL`, `APOLLO_WEBHOOK_SECRET`
+- ✅ Local storage: `apollo_phone_webhooks` table (synced_to_hubspot=FALSE)
+- ✅ Approval workflow: `GET /phones/pending`, `POST /phones/approve`
+
+### Deployment Checklist
+- [ ] Run migration: `psql -f migrations/003_add_webhook_phone_data.sql`
+- [ ] Set `APOLLO_WEBHOOK_URL` to public endpoint (e.g., `https://api.yourdomain.com/api/webhooks/apollo/phone-reveal`)
+- [ ] Set `APOLLO_WEBHOOK_SECRET` for signature verification
+- [ ] Configure Supabase credentials (`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`)
 
 ---
 
