@@ -1,16 +1,29 @@
 """Application configuration with Pydantic Settings."""
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _find_env_file() -> str:
+    """Find .env file in current or parent directory."""
+    # Check current directory first (backend/.env)
+    if Path(".env").exists():
+        return ".env"
+    # Then check parent directory (project root .env)
+    if Path("../.env").exists():
+        return "../.env"
+    # Default to current directory
+    return ".env"
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_find_env_file(),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -83,6 +96,18 @@ class Settings(BaseSettings):
     apollo_api_key: str = Field(default="")
     hunter_api_key: str = Field(default="")
     clearbit_api_key: str = Field(default="")
+
+    # Apollo Webhooks (PHONES ARE GOLD!)
+    # See docs/reference/APOLLO_ENRICHMENT.md for details
+    apollo_webhook_secret: str = Field(
+        default="",
+        description="Secret for validating Apollo webhook signatures (HMAC-SHA256)"
+    )
+    apollo_webhook_url: str = Field(
+        default="",
+        description="Public URL for Apollo phone callbacks. REQUIRED for mobile/direct phones. "
+        "Example: https://api.yourdomain.com/api/webhooks/apollo/phone-reveal"
+    )
 
     # Monitoring
     langchain_tracing_v2: bool = False

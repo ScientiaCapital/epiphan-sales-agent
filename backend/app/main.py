@@ -11,6 +11,7 @@ from app.api.routes.competitors import router as competitors_router
 from app.api.routes.leads import router as leads_router
 from app.api.routes.personas import router as personas_router
 from app.api.routes.scripts import router as scripts_router
+from app.api.routes.webhooks import router as webhooks_router
 from app.core.config import settings
 from app.core.rate_limit import setup_rate_limiting
 
@@ -71,3 +72,4 @@ app.include_router(competitors_router, prefix="/api/competitors", tags=["competi
 app.include_router(leads_router, prefix="/api", tags=["leads"])
 app.include_router(agents_router)  # Already has /api/agents prefix
 app.include_router(batch_router)  # Already has /api/batch prefix
+app.include_router(webhooks_router)  # Already has /api/webhooks prefix - PHONES ARE GOLD!
