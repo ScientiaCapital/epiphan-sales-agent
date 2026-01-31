@@ -437,9 +437,9 @@ class RateLimitStatus:
     def get_backoff_seconds(self) -> float:
         """Calculate exponential backoff based on consecutive rate limits."""
         if self.consecutive_rate_limits == 0:
-            return 0
+            return 0.0
         # Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 32s
-        return min(32, 2 ** (self.consecutive_rate_limits - 1))
+        return float(min(32, 2 ** (self.consecutive_rate_limits - 1)))
 
     def should_pause(self, safety_margin: int = 5) -> bool:
         """Check if we should pause to avoid rate limits.

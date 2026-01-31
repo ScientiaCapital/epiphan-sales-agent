@@ -5,7 +5,7 @@ to build comprehensive research briefs for sales outreach.
 """
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 from app.data.lead_schemas import Lead
 from app.services.langgraph.states import LeadResearchState, ResearchBrief
@@ -26,11 +26,11 @@ class LeadResearchAgent:
     Flow: enrich_apis (parallel) → scrape_web (optional) → synthesize → format_brief
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the agent."""
-        self._graph: StateGraph | None = None
+        self._graph: StateGraph[LeadResearchState] | None = None
 
-    def _build_graph(self) -> StateGraph:
+    def _build_graph(self) -> StateGraph[LeadResearchState]:
         """Build the LangGraph state graph."""
         graph = StateGraph(LeadResearchState)
 
@@ -279,7 +279,7 @@ class LeadResearchAgent:
         }
 
         # Run the graph
-        result = await compiled.ainvoke(initial_state)
+        result = await compiled.ainvoke(cast(Any, initial_state))
 
         return {
             "research_brief": result.get("research_brief"),

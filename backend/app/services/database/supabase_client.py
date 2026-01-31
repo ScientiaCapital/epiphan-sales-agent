@@ -1,7 +1,9 @@
 """Supabase client for local lead storage and scoring."""
 
 from functools import lru_cache
-from typing import Any
+from typing import Any, cast
+
+from postgrest.types import CountMethod
 
 from app.core.config import settings
 from supabase import Client, create_client
@@ -17,7 +19,7 @@ class SupabaseClient:
     - Outreach tracking
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize Supabase client with settings."""
         self._client: Client | None = None
 
@@ -55,7 +57,7 @@ class SupabaseClient:
             .upsert(lead_data, on_conflict="hubspot_id")
             .execute()
         )
-        return result.data[0] if result.data else {}
+        return cast(dict[str, Any], result.data[0]) if result.data else {}
 
     def upsert_leads_batch(
         self, leads: list[dict[str, Any]], batch_size: int = 100
@@ -92,7 +94,7 @@ class SupabaseClient:
             .single()
             .execute()
         )
-        return result.data
+        return cast(dict[str, Any] | None, result.data)
 
     def get_lead_by_hubspot_id(self, hubspot_id: str) -> dict[str, Any] | None:
         """Get a lead by HubSpot ID."""
@@ -103,7 +105,7 @@ class SupabaseClient:
             .single()
             .execute()
         )
-        return result.data
+        return cast(dict[str, Any] | None, result.data)
 
     def get_unscored_leads(self, limit: int = 1000) -> list[dict[str, Any]]:
         """Get leads that haven't been scored yet."""
@@ -209,7 +211,7 @@ class SupabaseClient:
         for tier in tiers:
             result = (
                 self.client.table("leads")
-                .select("id", count="exact")
+                .select("id", count=CountMethod.exact)
                 .eq("tier", tier)
                 .execute()
             )
@@ -221,7 +223,7 @@ class SupabaseClient:
         """Get total number of leads."""
         result = (
             self.client.table("leads")
-            .select("id", count="exact")
+            .select("id", count=CountMethod.exact)
             .execute()
         )
         return result.count or 0
@@ -274,7 +276,7 @@ class SupabaseClient:
             })
             .execute()
         )
-        return result.data[0] if result.data else {}
+        return cast(dict[str, Any], result.data[0]) if result.data else {}
 
     def get_unsynced_phones(self, limit: int = 100) -> list[dict[str, Any]]:
         """
@@ -346,7 +348,7 @@ class SupabaseClient:
     def create_outreach_event(self, event_data: dict[str, Any]) -> dict[str, Any]:
         """Create an outreach event."""
         result = self.client.table("outreach_events").insert(event_data).execute()
-        return result.data[0] if result.data else {}
+        return cast(dict[str, Any], result.data[0]) if result.data else {}
 
     def get_scheduled_events(
         self, before: str | None = None, limit: int = 100

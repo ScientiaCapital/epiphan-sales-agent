@@ -56,7 +56,7 @@ class LinkedInPost(Base, TimestampMixin):
     post_type: Mapped[PostType] = mapped_column(String(20), default=PostType.TEXT)
 
     # Media (if applicable)
-    media_urls: Mapped[list | None] = mapped_column(ARRAY(String))
+    media_urls: Mapped[list[str] | None] = mapped_column(ARRAY(String))
     media_alt_text: Mapped[str | None] = mapped_column(Text)
 
     # Scheduling
@@ -74,7 +74,7 @@ class LinkedInPost(Base, TimestampMixin):
 
     # Categorization
     topic: Mapped[str | None] = mapped_column(String(100), index=True)
-    tags: Mapped[list | None] = mapped_column(ARRAY(String))
+    tags: Mapped[list[str] | None] = mapped_column(ARRAY(String))
     campaign: Mapped[str | None] = mapped_column(String(100))
 
     # Engagement Metrics (updated after publish)
@@ -119,12 +119,12 @@ class LinkedInCadence(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # Days (0=Monday, 6=Sunday)
-    posting_days: Mapped[list] = mapped_column(
+    posting_days: Mapped[list[int]] = mapped_column(
         ARRAY(Integer), default=[1, 3]  # Tuesday, Thursday
     )
 
     # Times (24-hour format)
-    posting_times: Mapped[list] = mapped_column(
+    posting_times: Mapped[list[str]] = mapped_column(
         ARRAY(String), default=["08:00", "12:00"]
     )
 
@@ -211,7 +211,7 @@ class LinkedInTemplate(Base, TimestampMixin):
     # Categorization
     persona: Mapped[str | None] = mapped_column(String(100))  # Target audience
     use_case: Mapped[str | None] = mapped_column(String(100))
-    tags: Mapped[list | None] = mapped_column(ARRAY(String))
+    tags: Mapped[list[str] | None] = mapped_column(ARRAY(String))
 
     # Performance
     times_used: Mapped[int] = mapped_column(Integer, default=0)

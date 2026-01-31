@@ -39,9 +39,9 @@ class SemanticMemory:
     Falls back to in-memory store for testing.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize semantic memory."""
-        self._store: dict[str, Any] | None = None
+        self._store: Any = None
         self._use_postgres = settings.environment != "test"
         self._memory_store: dict[tuple[str, ...], dict[str, Any]] = {}
 

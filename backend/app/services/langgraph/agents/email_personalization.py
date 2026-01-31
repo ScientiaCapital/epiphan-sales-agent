@@ -12,7 +12,7 @@ Features:
 import re
 from collections.abc import AsyncGenerator
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from app.data.lead_schemas import Lead
 from app.services.langgraph.checkpointing import get_checkpointer
@@ -33,12 +33,12 @@ class EmailPersonalizationAgent:
     Flow: gather_context → generate_email → parse_output
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the agent with LLM."""
         self._llm = llm_router.get_model("personalization")  # Claude for quality
-        self._graph: StateGraph | None = None
+        self._graph: StateGraph[EmailPersonalizationState] | None = None
 
-    def _build_graph(self) -> StateGraph:
+    def _build_graph(self) -> StateGraph[EmailPersonalizationState]:
         """Build the LangGraph state graph."""
         graph = StateGraph(EmailPersonalizationState)
 
@@ -102,7 +102,7 @@ class EmailPersonalizationAgent:
 
         # Generate with LLM (use self._llm to allow mocking)
         response = await self._llm.ainvoke(prompt)
-        raw_content = response.content
+        raw_content = str(response.content) if response.content else ""
 
         # Parse immediately to avoid state issues
         subject_line, email_body = self._parse_email_response(raw_content)
@@ -242,7 +242,7 @@ class EmailPersonalizationAgent:
             config = {"configurable": {"thread_id": thread_id}}
 
         # Run the graph
-        result = await compiled.ainvoke(initial_state, config=config if config else None)
+        result = await compiled.ainvoke(cast(Any, initial_state), config=cast(Any, config) if config else None)
 
         return self._extract_result(result)
 
@@ -295,7 +295,7 @@ class EmailPersonalizationAgent:
         config = {"configurable": {"thread_id": thread_id}}
 
         # Run until interrupt
-        result = await compiled.ainvoke(initial_state, config=config)
+        result = await compiled.ainvoke(cast(Any, initial_state), config=cast(Any, config))
 
         return {
             "thread_id": thread_id,
@@ -333,7 +333,7 @@ class EmailPersonalizationAgent:
 
         if approved:
             # Resume and complete the workflow
-            result = await compiled.ainvoke(None, config=config)
+            result = await compiled.ainvoke(cast(Any, None), config=cast(Any, config))
             return {
                 **self._extract_result(result),
                 "approved": True,
@@ -382,7 +382,7 @@ class EmailPersonalizationAgent:
         )
 
         async for event in compiled.astream(
-            initial_state,
+            cast(Any, initial_state),
             stream_mode="updates",
         ):
             node_name = list(event.keys())[0] if event else None

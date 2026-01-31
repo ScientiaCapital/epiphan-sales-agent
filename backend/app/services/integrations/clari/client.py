@@ -1,7 +1,7 @@
 """Clari Copilot integration client for conversation intelligence."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -19,7 +19,7 @@ class ClariCopilotClient:
     - Buying signals and objections
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.api_key = settings.clari_api_key
         self.api_base = settings.clari_api_base
         self.workspace_id = settings.clari_workspace_id
@@ -44,7 +44,7 @@ class ClariCopilotClient:
         - Specific AE (Lex, Phil, etc.)
         - Pagination
         """
-        params = {
+        params: dict[str, Any] = {
             "limit": limit,
             "offset": offset,
         }
@@ -63,7 +63,7 @@ class ClariCopilotClient:
                 params=params,
             )
             response.raise_for_status()
-            return response.json()
+            return cast(dict[str, Any], response.json())
 
     async def get_conversation_detail(
         self, conversation_id: str
@@ -75,7 +75,7 @@ class ClariCopilotClient:
                 headers=self.headers,
             )
             response.raise_for_status()
-            return response.json()
+            return cast(dict[str, Any], response.json())
 
     async def get_conversation_transcript(
         self, conversation_id: str
@@ -87,7 +87,7 @@ class ClariCopilotClient:
                 headers=self.headers,
             )
             response.raise_for_status()
-            return response.json()
+            return cast(dict[str, Any], response.json())
 
     async def get_conversation_insights(
         self, conversation_id: str
@@ -108,7 +108,7 @@ class ClariCopilotClient:
                 headers=self.headers,
             )
             response.raise_for_status()
-            return response.json()
+            return cast(dict[str, Any], response.json())
 
     async def get_ae_performance(
         self,
@@ -126,7 +126,7 @@ class ClariCopilotClient:
         - Engagement scores
         - Win rate trends
         """
-        params = {}
+        params: dict[str, Any] = {}
         if start_date:
             params["start_date"] = start_date.isoformat()
         if end_date:
@@ -139,7 +139,7 @@ class ClariCopilotClient:
                 params=params,
             )
             response.raise_for_status()
-            return response.json()
+            return cast(dict[str, Any], response.json())
 
     async def get_team_analytics(
         self,
@@ -147,7 +147,7 @@ class ClariCopilotClient:
         end_date: datetime | None = None,
     ) -> dict[str, Any]:
         """Get team-wide conversation analytics."""
-        params = {}
+        params: dict[str, Any] = {}
         if start_date:
             params["start_date"] = start_date.isoformat()
         if end_date:
@@ -160,7 +160,7 @@ class ClariCopilotClient:
                 params=params,
             )
             response.raise_for_status()
-            return response.json()
+            return cast(dict[str, Any], response.json())
 
     async def search_conversations(
         self,
@@ -187,7 +187,7 @@ class ClariCopilotClient:
                 json=payload,
             )
             response.raise_for_status()
-            return response.json()
+            return cast(dict[str, Any], response.json())
 
     async def get_deals_with_conversations(
         self,
@@ -199,7 +199,7 @@ class ClariCopilotClient:
 
         Useful for win/loss analysis.
         """
-        params = {}
+        params: dict[str, Any] = {}
         if deal_stage:
             params["deal_stage"] = deal_stage
         if outcome:
@@ -212,7 +212,7 @@ class ClariCopilotClient:
                 params=params,
             )
             response.raise_for_status()
-            return response.json()
+            return cast(dict[str, Any], response.json())
 
     def parse_conversation(self, raw_data: dict[str, Any]) -> dict[str, Any]:
         """Parse raw Clari response into our conversation model format."""

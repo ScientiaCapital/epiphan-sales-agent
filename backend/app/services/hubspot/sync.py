@@ -21,7 +21,7 @@ class HubSpotSyncService:
     - Data transformation: HubSpot format → Lead model
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize sync service."""
         self.batch_size = 100  # HubSpot API limit
         self.db_batch_size = 100  # Supabase upsert batch size

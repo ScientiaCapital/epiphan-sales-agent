@@ -13,7 +13,7 @@ Note: HubSpot SDK is synchronous, so we use asyncio.to_thread() to avoid blockin
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, cast
 
 from app.core.config import settings
 from hubspot import HubSpot
@@ -42,7 +42,7 @@ def _sync_hubspot_search(client: HubSpot, email: str) -> str | None:
         }
     )
     if search_response.results:
-        return search_response.results[0].id
+        return cast(str, search_response.results[0].id)
     return None
 
 

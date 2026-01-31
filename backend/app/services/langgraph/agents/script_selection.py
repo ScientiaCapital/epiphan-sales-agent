@@ -27,14 +27,14 @@ class ScriptSelectionAgent:
     3. personalize - Personalize script with LLM
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize agent with LLM and graph."""
         self.llm = llm_router.get_model("personalization")  # Claude for quality
-        self._graph: StateGraph | None = None
+        self._graph: StateGraph[ScriptSelectionState] | None = None
         self._compiled: Any = None
 
     @property
-    def graph(self) -> StateGraph:
+    def graph(self) -> StateGraph[ScriptSelectionState]:
         """Build and return the state graph."""
         if self._graph is None:
             self._graph = self._build_graph()
@@ -47,7 +47,7 @@ class ScriptSelectionAgent:
             self._compiled = self.graph.compile()
         return self._compiled
 
-    def _build_graph(self) -> StateGraph:
+    def _build_graph(self) -> StateGraph[ScriptSelectionState]:
         """Build the LangGraph state graph."""
         graph = StateGraph(ScriptSelectionState)
 
@@ -196,7 +196,7 @@ class ScriptSelectionAgent:
 
     def _build_prompt(self, state: ScriptSelectionState) -> str:
         """Build prompt for personalization."""
-        script = state["base_script"]
+        script = state["base_script"] or {}
         lead = state["lead"]
 
         if state["call_type"] == "warm":

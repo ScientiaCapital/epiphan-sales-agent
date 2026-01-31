@@ -4,6 +4,7 @@ Based on TypeScript interfaces from epiphan-bdr-playbook/study-app/data.
 """
 
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -455,6 +456,6 @@ class MarketIntelligence(BaseModel):
     category: str  # market_size, competitor_analysis, technology_trends, etc.
     title: str
     summary: str
-    data_points: dict = Field(default_factory=dict)
+    data_points: dict[str, Any] = Field(default_factory=dict)
     sources: list[str] = Field(default_factory=list)
     last_updated: str

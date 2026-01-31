@@ -93,7 +93,7 @@ class ICPScore(Base, TimestampMixin):
 
     # Vertical Classification
     primary_vertical: Mapped[Vertical | None] = mapped_column(String(30), index=True)
-    secondary_verticals: Mapped[list | None] = mapped_column(ARRAY(String))
+    secondary_verticals: Mapped[list[str] | None] = mapped_column(ARRAY(String))
     vertical_confidence: Mapped[float | None] = mapped_column(Float)
 
     # Persona Match
@@ -138,7 +138,7 @@ class ICPScore(Base, TimestampMixin):
     icp_reasoning: Mapped[str | None] = mapped_column(Text)
 
     # Buying Signals Detected
-    buying_signals: Mapped[list | None] = mapped_column(ARRAY(String))
+    buying_signals: Mapped[list[str] | None] = mapped_column(ARRAY(String))
     # Examples: "new_construction", "ada_compliance", "panopto_expansion", etc.
 
     __table_args__ = (

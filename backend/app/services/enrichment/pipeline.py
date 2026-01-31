@@ -28,7 +28,7 @@ from app.services.scoring.atl_detector import is_atl_decision_maker
 logger = logging.getLogger(__name__)
 
 # Task queue for background processing
-_processing_tasks: dict[str, asyncio.Task] = {}
+_processing_tasks: dict[str, asyncio.Task[None]] = {}
 
 
 async def queue_harvester_batch(
@@ -146,6 +146,8 @@ async def _process_harvester_batch(
                         # Track rate limit
                         rate_limit_tracker.record_request()
 
+                        # email is validated above (has_valid_email check)
+                        assert email is not None  # Type narrowing for mypy
                         tiered_result = await apollo_client.tiered_enrich(
                             email=email,
                             title=title,
@@ -290,7 +292,7 @@ async def _process_harvester_batch(
             del _processing_tasks[batch_id]
 
 
-async def get_batch_task(batch_id: str) -> asyncio.Task | None:
+async def get_batch_task(batch_id: str) -> asyncio.Task[None] | None:
     """Get the background task for a batch, if still running."""
     return _processing_tasks.get(batch_id)
 

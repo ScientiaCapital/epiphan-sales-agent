@@ -4,7 +4,8 @@ Provides helpers for adding Cache-Control headers to API responses.
 Uses in-memory caching via functools.lru_cache where needed.
 """
 
-from typing import TypeVar
+from collections.abc import Sequence
+from typing import Any, TypeVar
 
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -21,7 +22,7 @@ T = TypeVar("T", bound=BaseModel)
 
 
 def with_cache_headers(
-    data: BaseModel | list[BaseModel],
+    data: BaseModel | Sequence[BaseModel],
     max_age: int = DEFAULT_MAX_AGE,
 ) -> JSONResponse:
     """Wrap response data with Cache-Control headers.
@@ -38,10 +39,12 @@ def with_cache_headers(
         async def list_personas() -> JSONResponse:
             return with_cache_headers(PERSONAS)
     """
-    if isinstance(data, list):
-        content = [item.model_dump(mode="json") for item in data]
-    else:
+    content: list[dict[str, Any]] | dict[str, Any]
+    if isinstance(data, BaseModel):
         content = data.model_dump(mode="json")
+    else:
+        # Sequence of models
+        content = [item.model_dump(mode="json") for item in data]
 
     return JSONResponse(
         content=content,

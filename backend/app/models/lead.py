@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -170,7 +171,7 @@ class Lead(Base, TimestampMixin):
     utm_campaign: Mapped[str | None] = mapped_column(String(100))
 
     # Enrichment Data (JSON blob from Apollo)
-    enrichment_data: Mapped[dict | None] = mapped_column(JSONB)
+    enrichment_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     enriched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Sync Metadata
@@ -207,7 +208,7 @@ class LeadAuditLog(Base):
     stage: Mapped[LeadAuditStage] = mapped_column(String(30), index=True)
 
     # Decision Data (what the agent decided and why)
-    decision_data: Mapped[dict | None] = mapped_column(JSONB)
+    decision_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     # Performance Metrics
     latency_ms: Mapped[int | None] = mapped_column(Integer)

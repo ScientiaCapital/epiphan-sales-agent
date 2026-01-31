@@ -21,7 +21,7 @@ Features:
 
 from collections.abc import AsyncGenerator
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from app.data.lead_schemas import Lead
 from app.services.langgraph.checkpointing import get_checkpointer
@@ -29,6 +29,7 @@ from app.services.langgraph.states import (
     DimensionScore,
     ICPScoreBreakdown,
     QualificationState,
+    QualificationTier,
 )
 from app.services.langgraph.tools.qualification_tools import (
     WEIGHT_BUYING_AUTHORITY,
@@ -60,11 +61,11 @@ class QualificationAgent:
     Uses LangGraph StateGraph for orchestration.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the agent."""
-        self._graph: StateGraph | None = None
+        self._graph: StateGraph[QualificationState] | None = None
 
-    def _build_graph(self) -> StateGraph:
+    def _build_graph(self) -> StateGraph[QualificationState]:
         """Build the LangGraph state graph."""
         graph = StateGraph(QualificationState)
 
@@ -280,6 +281,14 @@ class QualificationAgent:
         score_breakdown = state["score_breakdown"]
         missing_info = state.get("missing_info", [])
 
+        # Ensure score_breakdown exists
+        if not score_breakdown:
+            return {
+                "total_score": 0.0,
+                "tier": QualificationTier.NOT_ICP,
+                "confidence": 0.0,
+            }
+
         # Calculate total weighted score
         total_score = calculate_weighted_score(score_breakdown)
 
@@ -312,7 +321,7 @@ class QualificationAgent:
         """
         Determine recommended next action based on tier.
         """
-        tier = state["tier"]
+        tier = state["tier"] or QualificationTier.NOT_ICP
         missing_info = state.get("missing_info", [])
         confidence = state.get("confidence", 0.5)
 
@@ -400,7 +409,7 @@ class QualificationAgent:
             config = {"configurable": {"thread_id": thread_id}}
 
         # Run the graph
-        result = await compiled.ainvoke(initial_state, config=config if config else None)
+        result = await compiled.ainvoke(cast(Any, initial_state), config=cast(Any, config) if config else None)
 
         return self._extract_result(result)
 
@@ -444,8 +453,8 @@ class QualificationAgent:
 
         # Stream with updates mode
         async for event in compiled.astream(
-            initial_state,
-            config=config if config else None,
+            cast(Any, initial_state),
+            config=cast(Any, config) if config else None,
             stream_mode="updates",
         ):
             # Extract node name from event keys
@@ -484,6 +493,6 @@ class QualificationAgent:
         config = {"configurable": {"thread_id": thread_id}}
 
         # Resume with human input
-        result = await compiled.ainvoke(human_input, config=config)
+        result = await compiled.ainvoke(cast(Any, human_input), config=cast(Any, config))
 
         return self._extract_result(result)

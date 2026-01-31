@@ -44,11 +44,12 @@ class Settings(BaseSettings):
 
     @field_validator("cors_origins", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v):
+    def parse_cors_origins(cls, v: str | list[str]) -> list[str]:
         if isinstance(v, str):
             import json
 
-            return json.loads(v)
+            result: list[str] = json.loads(v)
+            return result
         return v
 
     # Database

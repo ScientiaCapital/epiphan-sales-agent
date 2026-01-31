@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -85,16 +86,16 @@ class Conversation(Base, TimestampMixin):
     talk_ratio: Mapped[float | None] = mapped_column(Float)  # AE talk time %
 
     # Extracted Signals
-    buying_signals: Mapped[list | None] = mapped_column(ARRAY(String))
-    objections: Mapped[list | None] = mapped_column(ARRAY(String))
-    competitors_mentioned: Mapped[list | None] = mapped_column(ARRAY(String))
-    next_steps: Mapped[list | None] = mapped_column(ARRAY(String))
-    pain_points: Mapped[list | None] = mapped_column(ARRAY(String))
-    decision_makers: Mapped[list | None] = mapped_column(ARRAY(String))
+    buying_signals: Mapped[list[str] | None] = mapped_column(ARRAY(String))
+    objections: Mapped[list[str] | None] = mapped_column(ARRAY(String))
+    competitors_mentioned: Mapped[list[str] | None] = mapped_column(ARRAY(String))
+    next_steps: Mapped[list[str] | None] = mapped_column(ARRAY(String))
+    pain_points: Mapped[list[str] | None] = mapped_column(ARRAY(String))
+    decision_makers: Mapped[list[str] | None] = mapped_column(ARRAY(String))
 
     # Topics & Keywords
-    topics: Mapped[list | None] = mapped_column(ARRAY(String))
-    key_phrases: Mapped[list | None] = mapped_column(ARRAY(String))
+    topics: Mapped[list[str] | None] = mapped_column(ARRAY(String))
+    key_phrases: Mapped[list[str] | None] = mapped_column(ARRAY(String))
 
     # Outcome
     outcome: Mapped[ConversationOutcome | None] = mapped_column(
@@ -108,7 +109,7 @@ class Conversation(Base, TimestampMixin):
     deal_amount: Mapped[float | None] = mapped_column(Float)
 
     # Full Analysis (JSON blob with detailed AI analysis)
-    full_analysis: Mapped[dict | None] = mapped_column(JSONB)
+    full_analysis: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     # Sync Metadata
     synced_from_clari_at: Mapped[datetime | None] = mapped_column(

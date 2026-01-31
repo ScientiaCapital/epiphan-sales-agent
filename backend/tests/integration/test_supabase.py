@@ -337,8 +337,8 @@ class TestRowLevelSecurity:
 
     def test_rls_restricts_access(
         self,
-        _supabase_client: Client,
-        _supabase_admin_client: Client,
+        supabase_client: Client,
+        supabase_admin_client: Client,
     ) -> None:
         """
         Test that RLS restricts access appropriately.
@@ -346,6 +346,10 @@ class TestRowLevelSecurity:
         This test assumes you have a table with user-specific RLS.
         Adjust the table name and policies according to your schema.
         """
+        # Mark fixtures as intentionally unused (placeholder test)
+        _ = supabase_client
+        _ = supabase_admin_client
+
         # This is a placeholder - implement based on your actual RLS policies
         # Example: If you have a 'user_posts' table where users can only see their own posts
 

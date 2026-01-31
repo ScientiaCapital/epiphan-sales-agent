@@ -133,9 +133,9 @@ class ApolloClient:
     def _get_backoff_seconds(self) -> float:
         """Calculate exponential backoff based on consecutive rate limits."""
         if self._consecutive_rate_limits == 0:
-            return 0
+            return 0.0
         # Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 32s
-        return min(32, self.BASE_BACKOFF_SECONDS * (2 ** (self._consecutive_rate_limits - 1)))
+        return float(min(32, self.BASE_BACKOFF_SECONDS * (2 ** (self._consecutive_rate_limits - 1))))
 
     def get_rate_limit_status(self) -> dict[str, Any]:
         """Get current rate limit status for monitoring.
@@ -195,7 +195,8 @@ class ApolloClient:
 
                 # Success - reset consecutive rate limit counter
                 self._consecutive_rate_limits = 0
-                return response.json()
+                result: dict[str, Any] = response.json()
+                return result
 
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 429:
@@ -516,7 +517,7 @@ class ApolloClient:
             credits_used=9,  # 1 (basic) + 8 (phone reveal)
         )
 
-    async def close(self):
+    async def close(self) -> None:
         """Close the HTTP client."""
         if self._client:
             await self._client.aclose()

@@ -115,7 +115,7 @@ class PersonaMatcher:
     Returns a PersonaMatch with persona_id and confidence score (0-1).
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize matcher with persona data."""
         self.personas = PERSONAS
         self._build_title_index()

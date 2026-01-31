@@ -72,10 +72,10 @@ class ScoreRequest(BaseModel):
 class LeadPrioritizedResponse(BaseModel):
     """Response for prioritized leads query."""
 
-    leads: list[dict]
+    leads: list[dict[str, Any]]
     total_count: int
     tier_counts: dict[str, int]
-    query: dict
+    query: dict[str, Any]
 
 
 # =============================================================================
@@ -273,8 +273,8 @@ class LeadIngestResponse(BaseModel):
 # =============================================================================
 
 
-@router.post("/sync", response_model=dict)
-async def sync_leads(request: SyncRequest | None = None) -> dict:
+@router.post("/sync", response_model=dict[str, Any])
+async def sync_leads(request: SyncRequest | None = None) -> dict[str, Any]:
     """
     Trigger HubSpot to Supabase sync.
 
@@ -479,7 +479,7 @@ async def ingest_leads(request: LeadIngestRequest) -> LeadIngestResponse:
                     )
 
                 # Run qualification agent
-                enrichment_data = None
+                enrichment_data: dict[str, Any] | None = None
                 if request.enrich and apollo_data:
                     enrichment_data = {"apollo": apollo_data}
                     if harvester_lead.tech_stack:
@@ -662,8 +662,8 @@ async def ingest_leads(request: LeadIngestRequest) -> LeadIngestResponse:
     )
 
 
-@router.post("/score", response_model=dict)
-async def score_leads(request: ScoreRequest | None = None) -> dict:
+@router.post("/score", response_model=dict[str, Any])
+async def score_leads(request: ScoreRequest | None = None) -> dict[str, Any]:
     """
     Score all unscored leads.
 
@@ -772,8 +772,8 @@ async def get_prioritized_leads(
     )
 
 
-@router.get("/{lead_id}", response_model=dict)
-async def get_lead_by_id(lead_id: str) -> dict:
+@router.get("/{lead_id}", response_model=dict[str, Any])
+async def get_lead_by_id(lead_id: str) -> dict[str, Any]:
     """
     Get a single lead by ID.
 

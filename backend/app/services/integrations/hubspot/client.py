@@ -21,7 +21,7 @@ class HubSpotClient:
     - Activity logging
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.client = HubSpot(access_token=settings.hubspot_access_token)
         self.portal_id = settings.hubspot_portal_id
 
@@ -314,9 +314,10 @@ class HubSpotClient:
                 headers={"Authorization": f"Bearer {settings.hubspot_access_token}"},
                 json=engagement_data,
             )
-            return response.json()
+            result: dict[str, Any] = response.json()
+            return result
 
-    def _contact_to_dict(self, contact) -> dict[str, Any]:
+    def _contact_to_dict(self, contact: Any) -> dict[str, Any]:
         """Convert HubSpot contact object to dictionary."""
         props = contact.properties
         return {
@@ -340,7 +341,7 @@ class HubSpotClient:
             "last_contacted": props.get("notes_last_contacted"),
         }
 
-    def _company_to_dict(self, company) -> dict[str, Any]:
+    def _company_to_dict(self, company: Any) -> dict[str, Any]:
         """Convert HubSpot company object to dictionary."""
         props = company.properties
         return {
@@ -355,7 +356,7 @@ class HubSpotClient:
             "country": props.get("country"),
         }
 
-    def _deal_to_dict(self, deal) -> dict[str, Any]:
+    def _deal_to_dict(self, deal: Any) -> dict[str, Any]:
         """Convert HubSpot deal object to dictionary."""
         props = deal.properties
         return {

@@ -27,7 +27,7 @@ class CheckpointManager:
     to MemorySaver for testing/development.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize checkpoint manager."""
         self._checkpointer: Any = None
         self._initialized = False

@@ -1,6 +1,7 @@
 """Pattern models for ML-based lead analysis."""
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -33,7 +34,7 @@ class LeadPattern(Base, TimestampMixin):
     description: Mapped[str] = mapped_column(Text)
 
     # Pattern Criteria (what defines this pattern)
-    criteria: Mapped[dict] = mapped_column(JSONB)
+    criteria: Mapped[dict[str, Any]] = mapped_column(JSONB)
     # Example criteria:
     # {
     #     "industry": ["education", "media"],
@@ -51,12 +52,12 @@ class LeadPattern(Base, TimestampMixin):
     avg_sales_cycle_days: Mapped[int | None] = mapped_column(Integer)
 
     # Sample Leads (IDs of leads that match this pattern)
-    sample_lead_ids: Mapped[list | None] = mapped_column(ARRAY(Integer))
+    sample_lead_ids: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
 
     # Best Practices
     recommended_approach: Mapped[str | None] = mapped_column(Text)
     best_first_touch: Mapped[str | None] = mapped_column(String(50))  # email, call, linkedin
-    optimal_cadence: Mapped[dict | None] = mapped_column(JSONB)
+    optimal_cadence: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     # Effectiveness Tracking
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -92,7 +93,7 @@ class WinLossPattern(Base, TimestampMixin):
     description: Mapped[str] = mapped_column(Text)
 
     # Associated Factors
-    factors: Mapped[dict] = mapped_column(JSONB)
+    factors: Mapped[dict[str, Any]] = mapped_column(JSONB)
     # Win factors example:
     # {
     #     "had_champion": true,
@@ -111,14 +112,14 @@ class WinLossPattern(Base, TimestampMixin):
     # Statistics
     occurrences: Mapped[int] = mapped_column(Integer, default=0)
     avg_deal_size: Mapped[float | None] = mapped_column(Float)
-    industries: Mapped[list | None] = mapped_column(ARRAY(String))
-    company_sizes: Mapped[list | None] = mapped_column(ARRAY(String))
+    industries: Mapped[list[str] | None] = mapped_column(ARRAY(String))
+    company_sizes: Mapped[list[str] | None] = mapped_column(ARRAY(String))
 
     # Associated Conversations (Clari IDs that informed this pattern)
-    source_conversation_ids: Mapped[list | None] = mapped_column(ARRAY(Integer))
+    source_conversation_ids: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
 
     # AE Attribution (which AEs exhibited this pattern)
-    ae_names: Mapped[list | None] = mapped_column(ARRAY(String))
+    ae_names: Mapped[list[str] | None] = mapped_column(ARRAY(String))
 
     # Coaching Recommendations
     coaching_notes: Mapped[str | None] = mapped_column(Text)

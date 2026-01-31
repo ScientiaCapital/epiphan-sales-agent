@@ -20,7 +20,7 @@ class LLMRouter:
     # Task types that require high-quality output
     QUALITY_TASKS = {"personalization", "synthesis", "generation", "research"}
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize all LLM clients."""
         self._claude: ChatAnthropic | None = None
         self._cerebras: ChatOpenAI | None = None

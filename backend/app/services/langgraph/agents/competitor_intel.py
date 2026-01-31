@@ -25,14 +25,14 @@ class CompetitorIntelAgent:
     3. generate_response - Generate response using LLM
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize agent with LLM and graph."""
         self.llm = llm_router.get_model("lookup")  # Fast model for real-time
-        self._graph: StateGraph | None = None
+        self._graph: StateGraph[CompetitorIntelState] | None = None
         self._compiled: Any = None
 
     @property
-    def graph(self) -> StateGraph:
+    def graph(self) -> StateGraph[CompetitorIntelState]:
         """Build and return the state graph."""
         if self._graph is None:
             self._graph = self._build_graph()
@@ -45,7 +45,7 @@ class CompetitorIntelAgent:
             self._compiled = self.graph.compile()
         return self._compiled
 
-    def _build_graph(self) -> StateGraph:
+    def _build_graph(self) -> StateGraph[CompetitorIntelState]:
         """Build the LangGraph state graph."""
         graph = StateGraph(CompetitorIntelState)
 
@@ -158,7 +158,7 @@ class CompetitorIntelAgent:
 
         # Call LLM
         response = await self.llm.ainvoke(prompt)
-        response_text = response.content
+        response_text = str(response.content) if response.content else ""
 
         # Extract follow-up if present
         follow_up = None
@@ -174,7 +174,7 @@ class CompetitorIntelAgent:
 
     def _build_prompt(self, state: CompetitorIntelState) -> str:
         """Build prompt for LLM."""
-        battlecard = state["battlecard"]
+        battlecard = state["battlecard"] or {}
 
         differentiators_text = ""
         if state["relevant_differentiators"]:
@@ -189,12 +189,12 @@ class CompetitorIntelAgent:
         if state["proof_points"]:
             proof_points_text = "\n".join([f"- {p}" for p in state["proof_points"]])
 
-        return f"""You are a sales rep for Epiphan Video. A prospect mentioned competitor {battlecard['name']}.
+        return f"""You are a sales rep for Epiphan Video. A prospect mentioned competitor {battlecard.get('name', 'unknown')}.
 
 COMPETITOR INFO:
-- Name: {battlecard['name']}
-- Positioning: {battlecard['positioning']}
-- Price Range: {battlecard['price_range']}
+- Name: {battlecard.get('name', 'unknown')}
+- Positioning: {battlecard.get('positioning', 'N/A')}
+- Price Range: {battlecard.get('price_range', 'N/A')}
 
 RELEVANT DIFFERENTIATORS:
 {differentiators_text or "No specific differentiators matched."}

@@ -81,16 +81,16 @@ class WebScraper:
             robots_url = f"{base_url}/robots.txt"
             robots_text = await self._fetch(robots_url)
 
-            disallowed: set[str] = set()
+            parsed_disallowed: set[str] = set()
             for line in robots_text.split("\n"):
                 line = line.strip().lower()
                 if line.startswith("disallow:"):
                     path = line.split(":", 1)[1].strip()
                     if path:
-                        disallowed.add(path)
+                        parsed_disallowed.add(path)
 
-            self._robots_cache[base_url] = disallowed
-            return not any(parsed.path.startswith(p) for p in disallowed)
+            self._robots_cache[base_url] = parsed_disallowed
+            return not any(parsed.path.startswith(p) for p in parsed_disallowed)
 
         except ScraperError:
             # No robots.txt or error fetching - assume allowed
@@ -230,7 +230,7 @@ class WebScraper:
 
         return news_items
 
-    async def close(self):
+    async def close(self) -> None:
         """Close the HTTP client."""
         if self._client:
             await self._client.aclose()

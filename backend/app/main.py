@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -18,7 +19,7 @@ from app.core.rate_limit import setup_rate_limiting
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI):
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifecycle management."""
     # Startup
     print(f"Starting {settings.app_name} v{settings.version}")
@@ -51,7 +52,7 @@ setup_rate_limiting(app)
 
 
 @app.get("/")
-async def root():
+async def root() -> dict[str, str]:
     """Root endpoint."""
     return {
         "name": settings.app_name,
@@ -61,7 +62,7 @@ async def root():
 
 
 @app.get("/health")
-async def health():
+async def health() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "healthy"}
 

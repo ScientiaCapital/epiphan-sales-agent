@@ -285,7 +285,7 @@ def build_email_prompt(
 - CTA: {get_cta_for_sequence_step(sequence_step)}
 
 **Subject Line Patterns (choose one or adapt):**
-{chr(10).join(f'- {p}' for p in template.get('subject_patterns', [])[:3])}
+{chr(10).join(f'- {p}' for p in list(template.get('subject_patterns', []))[:3])}
 
 **Output Format:**
 Subject: [Your subject line]

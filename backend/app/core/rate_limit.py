@@ -4,12 +4,15 @@ Provides IP-based rate limiting for API endpoints.
 Default: 100 requests per minute per IP address.
 """
 
+from typing import Any, cast
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
+from starlette.responses import Response
 
 __all__ = [
     "limiter",
@@ -27,8 +30,8 @@ DEFAULT_RATE_LIMIT = "100/minute"
 
 def rate_limit_exceeded_handler(
     request: Request,  # noqa: ARG001 - required by FastAPI exception handler signature
-    exc: RateLimitExceeded,  # noqa: ARG001 - required by FastAPI exception handler signature
-) -> JSONResponse:
+    exc: Exception,  # noqa: ARG001 - required by FastAPI exception handler signature
+) -> Response:
     """Custom handler for rate limit exceeded errors.
 
     Returns a JSON response with 429 status code and descriptive message.
@@ -51,5 +54,8 @@ def setup_rate_limiting(app: FastAPI) -> None:
         app: FastAPI application instance
     """
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+    app.add_exception_handler(
+        RateLimitExceeded,
+        cast(Any, rate_limit_exceeded_handler),  # Type narrowing for slowapi handler
+    )
     app.add_middleware(SlowAPIMiddleware)

@@ -12,6 +12,7 @@ Exposes agent functionality through REST endpoints:
 """
 
 import json
+from collections.abc import AsyncGenerator
 from typing import Any
 
 from fastapi import APIRouter
@@ -344,7 +345,7 @@ async def qualify_lead_stream(request: QualificationRequest) -> StreamingRespons
 
     Use this for real-time UI feedback during qualification.
     """
-    async def event_stream():
+    async def event_stream() -> AsyncGenerator[str, None]:
         async for event in qualification_agent.stream(
             lead=request.lead,
             enrichment_data=request.enrichment_data,
