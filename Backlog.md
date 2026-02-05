@@ -1,25 +1,19 @@
 # Product Backlog
 
-## Priority 1 - Call Outcome Tracking (Next Sprint)
-- [ ] Design call outcome schema (connected, voicemail, no answer, callback, not interested)
-- [ ] `POST /api/calls/outcome` endpoint
-- [ ] Cadence management (auto-schedule follow-ups based on outcome)
-- [ ] Link outcomes to call briefs for feedback loop
-
-## Priority 2 - Production Deployment
+## Priority 1 - Production Deployment
 - [ ] Add API authentication (API key or JWT)
 - [ ] Set up production environment variables
-- [ ] Run SQL migrations (001, 002, 003)
+- [ ] Run SQL migrations (001, 002, 003, 004)
 - [ ] Configure public webhook URLs
 - [ ] Set up monitoring/alerting
 
-## Priority 3 - Frontend
+## Priority 2 - Frontend
 - [ ] Build monitoring dashboard UI
 - [ ] Phone approval interface
 - [ ] Call brief viewer / daily call list UI
 - [ ] Batch status viewer
 
-## Priority 4 - Enhanced Features
+## Priority 3 - Enhanced Features
 - [ ] Supabase persistence for batch tracking (currently in-memory)
 - [ ] Historical credit usage charts
 - [ ] Webhook retry logic for failures
@@ -32,6 +26,13 @@
 ---
 
 ## Completed
+
+### Call Outcome Tracking (DONE - 2026-02-05)
+- [x] Migration `004_add_call_outcomes.sql` — new table with 5 indexes
+- [x] 7 API endpoints: log, batch, stats, range, follow-ups, history, HubSpot sync
+- [x] CallOutcomeService with auto follow-up rules + lead status updates
+- [x] 8 new Supabase CRUD methods
+- [x] 47 new tests (30 API + 17 service)
 
 ### Call Prep Brief + Ready-to-Dial (DONE - 2026-02-05)
 - [x] CallBriefAssembler composition layer (asyncio.gather, 3 agents in parallel)
@@ -88,7 +89,7 @@
 - [x] Background processing pipeline
 
 ### Testing (DONE)
-- [x] 1017 tests (1012 passed, 5 skipped)
+- [x] 1069 tests (1064 passed, 5 skipped)
 - [x] Comprehensive test coverage for all features
 
 ### Tech Debt Resolution (DONE)
