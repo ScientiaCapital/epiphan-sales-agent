@@ -14,6 +14,8 @@ import pytest
 from app.services.langgraph.middleware import (
     DynamicModelMiddleware,
     MiddlewarePipeline,
+    ModelCallLimitMiddleware,
+    ModelFallbackMiddleware,
     PIIDetectionMiddleware,
     RateLimitBucket,
     RateLimitConfig,
@@ -446,10 +448,12 @@ class TestCreateDefaultPipeline:
         """Test creating pipeline with default settings."""
         pipeline = create_default_pipeline()
 
-        assert len(pipeline.middlewares) == 3
+        assert len(pipeline.middlewares) == 5
         assert isinstance(pipeline.middlewares[0], PIIDetectionMiddleware)
         assert isinstance(pipeline.middlewares[1], DynamicModelMiddleware)
         assert isinstance(pipeline.middlewares[2], RateLimitMiddleware)
+        assert isinstance(pipeline.middlewares[3], ModelCallLimitMiddleware)
+        assert isinstance(pipeline.middlewares[4], ModelFallbackMiddleware)
 
     def test_creates_pipeline_with_custom_settings(self) -> None:
         """Test creating pipeline with custom settings."""
@@ -463,3 +467,210 @@ class TestCreateDefaultPipeline:
         assert isinstance(pii_middleware, PIIDetectionMiddleware)
         assert pii_middleware.scrub_outputs is True
         assert "company.com" in pii_middleware.allowed_domains
+
+    def test_creates_pipeline_without_call_limits(self) -> None:
+        """Test creating pipeline with call limits disabled."""
+        pipeline = create_default_pipeline(enable_call_limits=False)
+
+        assert len(pipeline.middlewares) == 4
+        assert not any(
+            isinstance(m, ModelCallLimitMiddleware) for m in pipeline.middlewares
+        )
+
+    def test_creates_pipeline_without_fallback(self) -> None:
+        """Test creating pipeline with fallback disabled."""
+        pipeline = create_default_pipeline(enable_fallback=False)
+
+        assert len(pipeline.middlewares) == 4
+        assert not any(
+            isinstance(m, ModelFallbackMiddleware) for m in pipeline.middlewares
+        )
+
+
+class TestModelCallLimitMiddleware:
+    """Tests for ModelCallLimitMiddleware."""
+
+    @pytest.fixture
+    def middleware(self) -> ModelCallLimitMiddleware:
+        """Create middleware with test limits."""
+        return ModelCallLimitMiddleware(thread_limit=5, run_limit=3)
+
+    @pytest.mark.asyncio
+    async def test_increments_call_counts(
+        self, middleware: ModelCallLimitMiddleware
+    ) -> None:
+        """Test that call counts are incremented."""
+        state: dict[str, str] = {}
+
+        result = await middleware.before_agent(state)
+
+        assert result["_model_call_count"] == 1
+        assert result["_thread_call_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_tracks_thread_specific_counts(
+        self, middleware: ModelCallLimitMiddleware
+    ) -> None:
+        """Test that thread counts are tracked separately."""
+        state1 = {"_thread_id": "thread1"}
+        state2 = {"_thread_id": "thread2"}
+
+        await middleware.before_agent(state1)
+        await middleware.before_agent(state1)
+        await middleware.before_agent(state2)
+
+        assert middleware._thread_counts["thread1"] == 2
+        assert middleware._thread_counts["thread2"] == 1
+
+    @pytest.mark.asyncio
+    async def test_raises_on_run_limit_exceeded(
+        self, middleware: ModelCallLimitMiddleware
+    ) -> None:
+        """Test that error is raised when run limit exceeded."""
+        from app.services.langgraph.middleware import ModelCallLimitError
+
+        state: dict[str, str] = {}
+
+        # Use up the run limit
+        for _ in range(3):
+            await middleware.before_agent(state)
+
+        # Next call should raise
+        with pytest.raises(ModelCallLimitError) as exc_info:
+            await middleware.before_agent(state)
+
+        assert exc_info.value.limit_type == "run"
+        assert exc_info.value.count == 4
+        assert exc_info.value.limit == 3
+
+    @pytest.mark.asyncio
+    async def test_raises_on_thread_limit_exceeded(
+        self, middleware: ModelCallLimitMiddleware
+    ) -> None:
+        """Test that error is raised when thread limit exceeded."""
+        from app.services.langgraph.middleware import ModelCallLimitError
+
+        state = {"_thread_id": "test_thread"}
+        middleware.reset_run()  # Reset run counter to avoid hitting run limit first
+
+        # Use up the thread limit
+        for _ in range(5):
+            middleware.reset_run()  # Reset run counter each time
+            await middleware.before_agent(state)
+
+        # Next call should raise
+        middleware.reset_run()
+        with pytest.raises(ModelCallLimitError) as exc_info:
+            await middleware.before_agent(state)
+
+        assert exc_info.value.limit_type == "thread"
+
+    def test_reset_run_clears_counter(
+        self, middleware: ModelCallLimitMiddleware
+    ) -> None:
+        """Test that reset_run clears the run counter."""
+        middleware._current_run_count = 5
+
+        middleware.reset_run()
+
+        assert middleware._current_run_count == 0
+
+    def test_reset_thread_clears_specific_thread(
+        self, middleware: ModelCallLimitMiddleware
+    ) -> None:
+        """Test that reset_thread clears specific thread."""
+        middleware._thread_counts["thread1"] = 10
+        middleware._thread_counts["thread2"] = 5
+
+        middleware.reset_thread("thread1")
+
+        assert "thread1" not in middleware._thread_counts
+        assert middleware._thread_counts["thread2"] == 5
+
+    def test_get_stats_returns_statistics(
+        self, middleware: ModelCallLimitMiddleware
+    ) -> None:
+        """Test that get_stats returns statistics."""
+        stats = middleware.get_stats()
+
+        assert hasattr(stats, "thread_calls")
+        assert hasattr(stats, "run_calls")
+        assert hasattr(stats, "limit_errors")
+
+
+class TestModelFallbackMiddleware:
+    """Tests for ModelFallbackMiddleware."""
+
+    @pytest.fixture
+    def middleware(self) -> ModelFallbackMiddleware:
+        """Create middleware with test settings."""
+        return ModelFallbackMiddleware(
+            fallback_model="openrouter",
+            max_fallback_attempts=2,
+        )
+
+    @pytest.mark.asyncio
+    async def test_no_fallback_without_error(
+        self, middleware: ModelFallbackMiddleware
+    ) -> None:
+        """Test that fallback is not used without previous error."""
+        state: dict[str, str] = {}
+
+        result = await middleware.before_agent(state)
+
+        assert result["_use_fallback"] is False
+
+    @pytest.mark.asyncio
+    async def test_triggers_fallback_on_recorded_error(
+        self, middleware: ModelFallbackMiddleware
+    ) -> None:
+        """Test that fallback is triggered after recorded error."""
+        state: dict[str, str] = {}
+        state = middleware.record_primary_error(state, "API timeout")
+
+        result = await middleware.before_agent(state)
+
+        assert result["_use_fallback"] is True
+        assert result["_fallback_model"] == "openrouter"
+        assert result["_fallback_reason"] == "API timeout"
+
+    @pytest.mark.asyncio
+    async def test_respects_max_fallback_attempts(
+        self, middleware: ModelFallbackMiddleware
+    ) -> None:
+        """Test that max fallback attempts is respected."""
+        state: dict[str, str] = {}
+
+        # Record error and trigger fallbacks
+        state = middleware.record_primary_error(state, "error1")
+        await middleware.before_agent(state)  # 1st fallback
+
+        state = middleware.record_primary_error(state, "error2")
+        await middleware.before_agent(state)  # 2nd fallback
+
+        # Third attempt should not use fallback
+        state = middleware.record_primary_error(state, "error3")
+        result = await middleware.before_agent(state)
+
+        assert result["_use_fallback"] is False
+
+    def test_reset_clears_fallback_counter(
+        self, middleware: ModelFallbackMiddleware
+    ) -> None:
+        """Test that reset clears the fallback counter."""
+        middleware._fallback_count = 5
+
+        middleware.reset()
+
+        assert middleware._fallback_count == 0
+
+    def test_get_stats_returns_statistics(
+        self, middleware: ModelFallbackMiddleware
+    ) -> None:
+        """Test that get_stats returns statistics."""
+        stats = middleware.get_stats()
+
+        assert "total_fallbacks" in stats
+        assert "successful_fallbacks" in stats
+        assert "success_rate" in stats
+        assert "current_fallback_count" in stats

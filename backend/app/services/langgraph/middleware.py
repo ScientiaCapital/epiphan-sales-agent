@@ -603,6 +603,258 @@ class RateLimitMiddleware(AgentMiddleware):
 
 
 # =============================================================================
+# Model Call Limit Middleware
+# =============================================================================
+
+
+class ModelCallLimitError(Exception):
+    """Raised when model call limit is exceeded."""
+
+    def __init__(self, limit_type: str, count: int, limit: int) -> None:
+        self.limit_type = limit_type
+        self.count = count
+        self.limit = limit
+        super().__init__(
+            f"Model call limit exceeded: {limit_type} "
+            f"({count}/{limit} calls)"
+        )
+
+
+@dataclass
+class CallLimitStats:
+    """Statistics for model call limiting."""
+
+    thread_calls: int = 0
+    run_calls: int = 0
+    limit_errors: int = 0
+
+
+class ModelCallLimitMiddleware(AgentMiddleware):
+    """
+    Prevent runaway costs by limiting model calls.
+
+    Enforces limits at two levels:
+    - Per-thread: Limits total calls across an entire conversation
+    - Per-run: Limits calls within a single agent invocation
+
+    This is a defensive measure against infinite loops and
+    misconfigured agent graphs.
+
+    Usage:
+        middleware = ModelCallLimitMiddleware(
+            thread_limit=50,  # Max calls per conversation
+            run_limit=20,     # Max calls per single run
+        )
+        state = await middleware.before_agent(state)  # May raise ModelCallLimitError
+    """
+
+    def __init__(
+        self,
+        thread_limit: int = 50,
+        run_limit: int = 20,
+    ) -> None:
+        """
+        Initialize model call limit middleware.
+
+        Args:
+            thread_limit: Maximum model calls per thread/conversation
+            run_limit: Maximum model calls per single agent run
+        """
+        self.thread_limit = thread_limit
+        self.run_limit = run_limit
+
+        # Track calls by thread_id
+        self._thread_counts: dict[str, int] = {}
+        self._current_run_count = 0
+        self._stats = CallLimitStats()
+
+    async def before_agent(self, state: dict[str, Any]) -> dict[str, Any]:
+        """Check and increment call counts before execution."""
+        thread_id = state.get("_thread_id", "default")
+
+        # Increment counts
+        self._current_run_count += 1
+        self._thread_counts[thread_id] = self._thread_counts.get(thread_id, 0) + 1
+
+        # Update stats
+        self._stats.thread_calls = self._thread_counts[thread_id]
+        self._stats.run_calls = self._current_run_count
+
+        # Check run limit
+        if self._current_run_count > self.run_limit:
+            self._stats.limit_errors += 1
+            logger.error(
+                f"Run call limit exceeded: {self._current_run_count}/{self.run_limit}"
+            )
+            raise ModelCallLimitError(
+                "run", self._current_run_count, self.run_limit
+            )
+
+        # Check thread limit
+        if self._thread_counts[thread_id] > self.thread_limit:
+            self._stats.limit_errors += 1
+            logger.error(
+                f"Thread call limit exceeded: "
+                f"{self._thread_counts[thread_id]}/{self.thread_limit}"
+            )
+            raise ModelCallLimitError(
+                "thread", self._thread_counts[thread_id], self.thread_limit
+            )
+
+        # Add current counts to state for observability
+        state["_model_call_count"] = self._current_run_count
+        state["_thread_call_count"] = self._thread_counts[thread_id]
+
+        return state
+
+    async def after_agent(self, _state: dict[str, Any], result: Any) -> Any:
+        """No modification on output."""
+        return result
+
+    def reset_run(self) -> None:
+        """Reset run counter (call between agent invocations)."""
+        self._current_run_count = 0
+
+    def reset_thread(self, thread_id: str) -> None:
+        """Reset counter for a specific thread."""
+        if thread_id in self._thread_counts:
+            del self._thread_counts[thread_id]
+
+    def reset_all(self) -> None:
+        """Reset all counters."""
+        self._thread_counts.clear()
+        self._current_run_count = 0
+
+    def get_stats(self) -> CallLimitStats:
+        """Get call limit statistics."""
+        return self._stats
+
+
+# =============================================================================
+# Model Fallback Middleware
+# =============================================================================
+
+
+@dataclass
+class FallbackAttempt:
+    """Record of a fallback attempt."""
+
+    timestamp: datetime
+    primary_error: str
+    fallback_model: str
+    success: bool
+
+
+class ModelFallbackMiddleware(AgentMiddleware):
+    """
+    Fallback to secondary model on primary model failure.
+
+    Provides multi-provider redundancy by catching primary model
+    errors and attempting the request with a fallback model.
+
+    Usage:
+        middleware = ModelFallbackMiddleware(
+            fallback_model="openrouter",
+            max_fallback_attempts=3,
+        )
+        state = await middleware.before_agent(state)
+        # If primary fails, state["_use_fallback"] will be True
+    """
+
+    def __init__(
+        self,
+        fallback_model: str = "openrouter",
+        max_fallback_attempts: int = 3,
+        retry_on_errors: tuple[type[Exception], ...] | None = None,
+    ) -> None:
+        """
+        Initialize model fallback middleware.
+
+        Args:
+            fallback_model: Name of fallback model to use
+            max_fallback_attempts: Maximum fallback attempts per run
+            retry_on_errors: Exception types that trigger fallback
+        """
+        self.fallback_model = fallback_model
+        self.max_fallback_attempts = max_fallback_attempts
+        self.retry_on_errors = retry_on_errors or (
+            TimeoutError,
+            ConnectionError,
+        )
+
+        self._fallback_count = 0
+        self._attempts: list[FallbackAttempt] = []
+
+    async def before_agent(self, state: dict[str, Any]) -> dict[str, Any]:
+        """Check if fallback is needed based on previous errors."""
+        # Check if we should use fallback from previous failure
+        last_error = state.get("_last_model_error")
+        if last_error and self._fallback_count < self.max_fallback_attempts:
+            state["_use_fallback"] = True
+            state["_fallback_model"] = self.fallback_model
+            state["_fallback_reason"] = last_error
+            self._fallback_count += 1
+            logger.info(
+                f"Using fallback model {self.fallback_model} due to: {last_error}"
+            )
+        else:
+            state["_use_fallback"] = False
+
+        return state
+
+    async def after_agent(self, state: dict[str, Any], result: Any) -> Any:
+        """Record fallback result."""
+        if state.get("_use_fallback"):
+            # Check if result indicates success
+            success = not isinstance(result, Exception)
+            self._attempts.append(
+                FallbackAttempt(
+                    timestamp=datetime.now(timezone.utc),
+                    primary_error=state.get("_fallback_reason", "unknown"),
+                    fallback_model=self.fallback_model,
+                    success=success,
+                )
+            )
+        return result
+
+    def record_primary_error(self, state: dict[str, Any], error: str) -> dict[str, Any]:
+        """
+        Record a primary model error to trigger fallback on next call.
+
+        Call this when catching a model error:
+            state = middleware.record_primary_error(state, str(error))
+
+        Args:
+            state: Current agent state
+            error: Error message from primary model
+
+        Returns:
+            Updated state with error recorded
+        """
+        state["_last_model_error"] = error
+        return state
+
+    def reset(self) -> None:
+        """Reset fallback counter."""
+        self._fallback_count = 0
+
+    def get_attempts(self) -> list[FallbackAttempt]:
+        """Get fallback attempt history."""
+        return list(self._attempts)
+
+    def get_stats(self) -> dict[str, Any]:
+        """Get fallback statistics."""
+        total = len(self._attempts)
+        successful = sum(1 for a in self._attempts if a.success)
+        return {
+            "total_fallbacks": total,
+            "successful_fallbacks": successful,
+            "success_rate": successful / max(1, total),
+            "current_fallback_count": self._fallback_count,
+        }
+
+
+# =============================================================================
 # Middleware Pipeline
 # =============================================================================
 
@@ -660,6 +912,11 @@ def create_default_pipeline(
     scrub_pii_outputs: bool = False,
     allowed_email_domains: set[str] | None = None,
     rate_limit_config: RateLimitConfig | None = None,
+    enable_call_limits: bool = True,
+    thread_call_limit: int = 50,
+    run_call_limit: int = 20,
+    enable_fallback: bool = True,
+    fallback_model: str = "openrouter",
 ) -> MiddlewarePipeline:
     """
     Create default middleware pipeline.
@@ -668,15 +925,35 @@ def create_default_pipeline(
         scrub_pii_outputs: Whether to scrub PII from outputs
         allowed_email_domains: Email domains to allow in PII detection
         rate_limit_config: Rate limit configuration
+        enable_call_limits: Whether to enable model call limiting
+        thread_call_limit: Max model calls per thread
+        run_call_limit: Max model calls per run
+        enable_fallback: Whether to enable model fallback
+        fallback_model: Fallback model name
 
     Returns:
         Configured middleware pipeline
     """
-    return MiddlewarePipeline([
+    middlewares: list[AgentMiddleware] = [
         PIIDetectionMiddleware(
             scrub_outputs=scrub_pii_outputs,
             allowed_domains=allowed_email_domains,
         ),
         DynamicModelMiddleware(),
         RateLimitMiddleware(config=rate_limit_config),
-    ])
+    ]
+
+    if enable_call_limits:
+        middlewares.append(
+            ModelCallLimitMiddleware(
+                thread_limit=thread_call_limit,
+                run_limit=run_call_limit,
+            )
+        )
+
+    if enable_fallback:
+        middlewares.append(
+            ModelFallbackMiddleware(fallback_model=fallback_model)
+        )
+
+    return MiddlewarePipeline(middlewares)

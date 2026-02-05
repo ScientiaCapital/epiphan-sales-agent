@@ -242,7 +242,29 @@ API Request → Immediate: employer phone only
 
 ---
 
-## Recent Work (2026-02-05 Evening) - LangGraph v1.0 Best Practices
+## Recent Work (2026-02-05 Late Evening) - LangChain/LangGraph Gap Analysis Polish
+**Branch**: `main`
+
+Completed comprehensive gap analysis (54 documentation URLs analyzed) and implemented priority improvements:
+
+### Phase 1: Quick Wins
+- **Extended Thinking Integration**: `_is_edge_case()` detects borderline scores (28-32, 48-52, 68-72) and low confidence (<0.6), triggers `claude_with_thinking` for nuanced tier decisions
+- **List Reducers**: Added `Annotated[list, add]` to `OrchestratorState.errors` and `phase_results` - lists now append instead of overwrite
+- **Encrypted Checkpointing**: `AESCipher` class implementing `CipherProtocol`, activated via `LANGGRAPH_AES_KEY` env var
+
+### Phase 2: Middleware Enhancements
+- **ModelCallLimitMiddleware**: Prevents runaway costs with per-thread (50) and per-run (20) limits
+- **ModelFallbackMiddleware**: Records primary model errors, triggers fallback to OpenRouter on retry
+
+### Phase 3: Memory Enhancements
+- **UserMemoryStore** (`memory/user_store.py`): Cross-thread user preferences, interaction history, objections tracking
+- **ConversationSummarizer** (`memory/summarizer.py`): Context overflow management with key decision extraction
+
+**Code Quality**: 904 tests passed, 5 skipped, 0 mypy errors, 0 ruff errors (19 new middleware tests)
+
+---
+
+## Previous Work (2026-02-05 Evening) - LangGraph v1.0 Best Practices
 **Branch**: `feature/agent-polish` → merged to `main`
 
 Implemented recommendations from LangGraph documentation research (27 URLs analyzed):
@@ -264,7 +286,7 @@ Implemented recommendations from LangGraph documentation research (27 URLs analy
 
 ---
 
-## Previous Work (2026-02-05) - LangGraph Agent Polish Sprint
+## Previous Work (2026-02-05 Morning) - LangGraph Agent Polish Sprint
 **Branch**: `feature/agent-polish` → `feature/agent-orchestration`
 
 Completed 7-phase sprint implementing LangChain best practices:

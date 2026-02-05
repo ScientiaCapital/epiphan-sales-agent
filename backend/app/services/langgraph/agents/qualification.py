@@ -23,6 +23,8 @@ from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Any, cast
 
+from langchain_core.messages import HumanMessage, SystemMessage
+
 from app.data.lead_schemas import Lead
 from app.services.langgraph.checkpointing import get_checkpointer
 from app.services.langgraph.states import (
@@ -49,6 +51,7 @@ from app.services.langgraph.tools.qualification_tools import (
 from app.services.langgraph.tools.research_tools import (
     enrich_from_apollo,
 )
+from app.services.llm.clients import get_llm_router
 from langgraph.graph import END, StateGraph
 
 
@@ -59,11 +62,45 @@ class QualificationAgent:
     Flow: gather_data → [needs_inference?] → score_dimensions → calculate_final → recommend_action
 
     Uses LangGraph StateGraph for orchestration.
+    Extended thinking is used for edge cases with low confidence or borderline scores.
     """
+
+    # Borderline score ranges that warrant extended thinking
+    BORDERLINE_RANGES = [
+        (28, 32),   # Not ICP / Tier 3 boundary
+        (48, 52),   # Tier 3 / Tier 2 boundary
+        (68, 72),   # Tier 2 / Tier 1 boundary
+    ]
+
+    # Confidence threshold below which extended thinking is used
+    LOW_CONFIDENCE_THRESHOLD = 0.6
 
     def __init__(self) -> None:
         """Initialize the agent."""
         self._graph: StateGraph[QualificationState] | None = None
+        self._router = get_llm_router()
+
+    def _is_edge_case(self, total_score: float, confidence: float) -> bool:
+        """
+        Determine if this qualification requires extended thinking.
+
+        Edge cases include:
+        - Borderline scores near tier thresholds
+        - Low overall confidence in classification
+
+        Args:
+            total_score: The weighted qualification score (0-100)
+            confidence: The confidence level (0.0-1.0)
+
+        Returns:
+            True if extended thinking should be used
+        """
+        # Low confidence always triggers extended thinking
+        if confidence < self.LOW_CONFIDENCE_THRESHOLD:
+            return True
+
+        # Check if score is in a borderline range
+        return any(low <= total_score <= high for low, high in self.BORDERLINE_RANGES)
 
     def _build_graph(self) -> StateGraph[QualificationState]:
         """Build the LangGraph state graph."""
@@ -272,14 +309,105 @@ class QualificationAgent:
             "missing_info": missing_info,
         }
 
+    async def _apply_extended_thinking(
+        self,
+        lead: Lead,
+        score_breakdown: ICPScoreBreakdown,
+        total_score: float,
+        initial_tier: QualificationTier,
+        confidence: float,
+    ) -> tuple[QualificationTier, str]:
+        """
+        Use extended thinking model for nuanced tier decision on edge cases.
+
+        Extended thinking gives Claude a reasoning scratchpad to work through
+        ambiguous signals before making a final determination.
+
+        Args:
+            lead: The lead being qualified
+            score_breakdown: Dimension scores
+            total_score: Calculated weighted score
+            initial_tier: Tier from simple threshold assignment
+            confidence: Overall confidence level
+
+        Returns:
+            Tuple of (final_tier, reasoning_summary)
+        """
+        model = self._router.claude_with_thinking
+
+        system_prompt = """You are an ICP qualification expert for Epiphan Video.
+Your task is to make a nuanced tier determination for a borderline lead.
+
+Consider:
+1. Which dimensions have low confidence and why
+2. Patterns that suggest higher/lower fit than the score indicates
+3. Missing information that would change the classification
+4. Industry and persona signals that may not be captured in raw scores
+
+Tier definitions:
+- Tier 1 (70+): Priority sequence, AE involvement early - strong fit
+- Tier 2 (50-69): Standard sequence - good fit with some gaps
+- Tier 3 (30-49): Light touch, marketing nurture - potential fit needs development
+- Not ICP (<30): Disqualify - poor fit
+
+Respond with ONLY the tier name (tier_1, tier_2, tier_3, or not_icp) on the first line,
+followed by a brief explanation on subsequent lines."""
+
+        # Build context about the lead and scores
+        lead_context = f"""
+Lead: {lead.email}
+Company: {lead.company or 'Unknown'}
+Title: {lead.title or 'Unknown'}
+Current Score: {total_score:.1f}
+Initial Tier: {initial_tier.value}
+Confidence: {confidence:.2f}
+
+Score Breakdown:
+- Company Size: {score_breakdown['company_size']['raw_score']}/10 ({score_breakdown['company_size']['category']}) - {score_breakdown['company_size']['reason']}
+- Industry: {score_breakdown['industry_vertical']['raw_score']}/10 ({score_breakdown['industry_vertical']['category']}) - {score_breakdown['industry_vertical']['reason']}
+- Use Case: {score_breakdown['use_case_fit']['raw_score']}/10 ({score_breakdown['use_case_fit']['category']}) - {score_breakdown['use_case_fit']['reason']}
+- Tech Stack: {score_breakdown['tech_stack_signals']['raw_score']}/10 ({score_breakdown['tech_stack_signals']['category']}) - {score_breakdown['tech_stack_signals']['reason']}
+- Authority: {score_breakdown['buying_authority']['raw_score']}/10 ({score_breakdown['buying_authority']['category']}) - {score_breakdown['buying_authority']['reason']}
+"""
+
+        try:
+            response = await model.ainvoke([
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=lead_context),
+            ])
+
+            content = str(response.content).strip()
+            lines = content.split("\n")
+            tier_str = lines[0].strip().lower()
+            reasoning = "\n".join(lines[1:]).strip() if len(lines) > 1 else ""
+
+            # Map response to tier
+            tier_map = {
+                "tier_1": QualificationTier.TIER_1,
+                "tier_2": QualificationTier.TIER_2,
+                "tier_3": QualificationTier.TIER_3,
+                "not_icp": QualificationTier.NOT_ICP,
+            }
+
+            final_tier = tier_map.get(tier_str, initial_tier)
+            return final_tier, reasoning
+
+        except Exception:
+            # On any error, fall back to initial tier
+            return initial_tier, ""
+
     async def _calculate_final_node(
         self, state: QualificationState
     ) -> dict[str, Any]:
         """
         Calculate final weighted score and assign tier.
+
+        Uses extended thinking for edge cases with borderline scores
+        or low confidence to improve accuracy.
         """
         score_breakdown = state["score_breakdown"]
         missing_info = state.get("missing_info", [])
+        lead = state["lead"]
 
         # Ensure score_breakdown exists
         if not score_breakdown:
@@ -292,8 +420,8 @@ class QualificationAgent:
         # Calculate total weighted score
         total_score = calculate_weighted_score(score_breakdown)
 
-        # Assign tier
-        tier = assign_tier(total_score)
+        # Assign initial tier
+        initial_tier = assign_tier(total_score)
 
         # Calculate overall confidence
         confidences = [
@@ -309,11 +437,33 @@ class QualificationAgent:
         if missing_info:
             avg_confidence *= 0.8 ** len(missing_info)
 
-        return {
+        final_confidence = min(avg_confidence, 1.0)
+
+        # Use extended thinking for edge cases
+        final_tier = initial_tier
+        extended_reasoning = None
+
+        if self._is_edge_case(total_score, final_confidence):
+            final_tier, extended_reasoning = await self._apply_extended_thinking(
+                lead=lead,
+                score_breakdown=score_breakdown,
+                total_score=total_score,
+                initial_tier=initial_tier,
+                confidence=final_confidence,
+            )
+
+        result: dict[str, Any] = {
             "total_score": total_score,
-            "tier": tier,
-            "confidence": min(avg_confidence, 1.0),
+            "tier": final_tier,
+            "confidence": final_confidence,
         }
+
+        # Include extended reasoning if tier was changed
+        if extended_reasoning and final_tier != initial_tier:
+            result["extended_reasoning"] = extended_reasoning
+            result["tier_adjusted"] = True
+
+        return result
 
     async def _recommend_action_node(
         self, state: QualificationState

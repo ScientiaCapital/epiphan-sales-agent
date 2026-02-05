@@ -5,7 +5,8 @@ that flows through each agent's graph nodes.
 """
 
 from enum import Enum
-from typing import Any, TypedDict
+from operator import add
+from typing import Annotated, Any, TypedDict
 
 from app.data.lead_schemas import Lead
 
@@ -281,9 +282,9 @@ class OrchestratorState(TypedDict):
 
     # === Execution Tracking ===
     current_phase: str  # "research" | "gate_1" | "outreach" | "gate_2" | "sync" | "complete"
-    phase_results: list[PhaseResult]
+    phase_results: Annotated[list[PhaseResult], add]  # Appends instead of overwrites
     total_duration_ms: float
-    errors: list[str]
+    errors: Annotated[list[str], add]  # Appends instead of overwrites
 
     # === Derived Fields ===
     tier: QualificationTier | None  # Extracted from qualification_result
@@ -337,4 +338,4 @@ class OrchestratorOutput(TypedDict):
     script_result: dict[str, Any] | None
     email_result: dict[str, Any] | None
     hubspot_sync_result: dict[str, Any] | None
-    errors: list[str]
+    errors: Annotated[list[str], add]  # Appends instead of overwrites
