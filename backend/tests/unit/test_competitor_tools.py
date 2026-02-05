@@ -1,5 +1,7 @@
 """Tests for competitor intelligence tools."""
 
+import pytest
+from langchain_core.tools import ToolException
 
 
 class TestGetBattlecard:
@@ -15,13 +17,15 @@ class TestGetBattlecard:
         assert result["id"] == "blackmagic_atem"
         assert "key_differentiators" in result
 
-    def test_returns_none_for_unknown_competitor(self):
-        """Test returning None for unknown competitor."""
+    def test_raises_tool_exception_for_unknown_competitor(self):
+        """Test raising ToolException for unknown competitor."""
         from app.services.langgraph.tools.competitor_tools import get_battlecard
 
-        result = get_battlecard("unknown_competitor_xyz")
+        with pytest.raises(ToolException) as exc_info:
+            get_battlecard("unknown_competitor_xyz")
 
-        assert result is None
+        assert "No battlecard found" in str(exc_info.value)
+        assert "unknown_competitor_xyz" in str(exc_info.value)
 
     def test_matches_partial_name(self):
         """Test matching partial competitor name."""
@@ -71,13 +75,14 @@ class TestSearchDifferentiators:
 
         assert result == []
 
-    def test_returns_empty_for_unknown_competitor(self):
-        """Test returning empty for unknown competitor."""
+    def test_raises_tool_exception_for_unknown_competitor(self):
+        """Test raising ToolException for unknown competitor."""
         from app.services.langgraph.tools.competitor_tools import search_differentiators
 
-        result = search_differentiators("unknown_xyz", "recording")
+        with pytest.raises(ToolException) as exc_info:
+            search_differentiators("unknown_xyz", "recording")
 
-        assert result == []
+        assert "Competitor not found" in str(exc_info.value)
 
     def test_finds_multiple_matches(self):
         """Test finding multiple matching differentiators."""
@@ -110,13 +115,14 @@ class TestGetClaimResponses:
         assert len(result) > 0
         assert any("cheaper" in r["claim"].lower() for r in result)
 
-    def test_returns_empty_for_unknown_competitor(self):
-        """Test returning empty for unknown competitor."""
+    def test_raises_tool_exception_for_unknown_competitor(self):
+        """Test raising ToolException for unknown competitor."""
         from app.services.langgraph.tools.competitor_tools import get_claim_responses
 
-        result = get_claim_responses("unknown_xyz")
+        with pytest.raises(ToolException) as exc_info:
+            get_claim_responses("unknown_xyz")
 
-        assert result == []
+        assert "Competitor not found" in str(exc_info.value)
 
     def test_returns_all_when_no_keyword(self):
         """Test returning all claims when no keyword."""

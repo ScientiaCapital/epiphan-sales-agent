@@ -312,3 +312,64 @@ async def batch_process_stream(request: StreamingBatchRequest) -> StreamingRespo
             "Connection": "keep-alive",
         },
     )
+
+
+class TokenStreamRequest(BaseModel):
+    """Request for token-level streaming single lead processing."""
+
+    lead: Lead
+    skip_outreach: bool = Field(
+        default=False,
+        description="Skip outreach phase (research/qualify only)",
+    )
+
+
+@router.post("/process/stream/tokens")
+async def process_lead_stream_tokens(request: TokenStreamRequest) -> StreamingResponse:
+    """
+    Process a single lead with token-level streaming.
+
+    Uses astream_events(version="v2") for fine-grained events including:
+    - token: Individual LLM tokens as they're generated
+    - chain_start/chain_end: Node/chain execution events
+    - tool_start/tool_end: Tool execution events
+    - custom: Developer-defined custom events
+
+    This enables real-time UI feedback with typing indicators and
+    progress animations during LLM generation.
+
+    Example usage:
+        curl -N -X POST http://localhost:8001/api/batch/process/stream/tokens \\
+            -H "Content-Type: application/json" \\
+            -d '{"lead": {"hubspot_id": "123", "email": "test@example.com"}}'
+    """
+    from collections.abc import AsyncGenerator
+    from json import dumps
+
+    from app.services.langgraph.agents.orchestrator import MasterOrchestratorAgent
+
+    async def token_event_generator() -> AsyncGenerator[str, None]:
+        orchestrator = MasterOrchestratorAgent()
+
+        try:
+            async for event in orchestrator.stream_tokens(
+                lead=request.lead,
+                process_config={"skip_outreach": request.skip_outreach},
+            ):
+                yield f"data: {dumps(event)}\n\n"
+
+            # Send completion event
+            yield f"data: {dumps({'event_type': 'complete'})}\n\n"
+
+        except Exception as e:
+            error_event = {"event_type": "error", "error": str(e)}
+            yield f"data: {dumps(error_event)}\n\n"
+
+    return StreamingResponse(
+        token_event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )

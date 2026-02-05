@@ -6,6 +6,8 @@ Uses fast LLM (Cerebras/DeepSeek) for <2s response time.
 
 from typing import Any
 
+from langchain_core.tools import ToolException
+
 from app.services.langgraph.states import CompetitorIntelState
 from app.services.langgraph.tools.competitor_tools import (
     get_battlecard,
@@ -105,8 +107,12 @@ class CompetitorIntelAgent:
         state: CompetitorIntelState,
     ) -> dict[str, Any]:
         """Look up battlecard for competitor."""
-        battlecard = get_battlecard(state["competitor_name"])
-        return {"battlecard": battlecard}
+        try:
+            battlecard = get_battlecard(state["competitor_name"])
+            return {"battlecard": battlecard}
+        except ToolException:
+            # Handle unknown competitor gracefully
+            return {"battlecard": None}
 
     async def _match_context(
         self,
@@ -132,10 +138,14 @@ class CompetitorIntelAgent:
         # Get claim responses if query is about a claim
         proof_points = []
         if state["query_type"] == "claim":
-            claims = get_claim_responses(competitor_id)
-            for claim in claims:
-                if any(word in claim["claim"].lower() for word in context_lower.split()):
-                    proof_points.append(claim["response"])
+            try:
+                claims = get_claim_responses(competitor_id)
+                for claim in claims:
+                    if any(word in claim["claim"].lower() for word in context_lower.split()):
+                        proof_points.append(claim["response"])
+            except ToolException:
+                # Competitor not found - no proof points available
+                pass
 
         return {
             "relevant_differentiators": differentiators[:3],  # Top 3

@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from langchain_core.tools import ToolException
 
 from app.data.lead_schemas import Lead
 
@@ -48,8 +49,8 @@ class TestResearchTools:
         mock_enrich.assert_called_once_with("sarah.johnson@stateuniversity.edu")
 
     @pytest.mark.asyncio
-    async def test_enrich_from_apollo_handles_none(self, sample_lead: Lead):
-        """Test Apollo enrichment returns None when not found."""
+    async def test_enrich_from_apollo_raises_on_not_found(self, sample_lead: Lead):
+        """Test Apollo enrichment raises ToolException when not found."""
         from app.services.langgraph.tools.research_tools import enrich_from_apollo
 
         with patch(
@@ -58,9 +59,10 @@ class TestResearchTools:
         ) as mock_enrich:
             mock_enrich.return_value = None
 
-            result = await enrich_from_apollo(sample_lead.email)
+            with pytest.raises(ToolException) as exc_info:
+                await enrich_from_apollo(sample_lead.email)
 
-        assert result is None
+        assert "No Apollo data found" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_scrape_company_website(self):

@@ -7,11 +7,13 @@ Provides functions to enrich lead data from multiple sources:
 
 from typing import Any
 
+from langchain_core.tools import ToolException
+
 from app.services.enrichment.apollo import apollo_client
 from app.services.enrichment.scraper import web_scraper
 
 
-async def enrich_from_apollo(email: str) -> dict[str, Any] | None:
+async def enrich_from_apollo(email: str) -> dict[str, Any]:
     """
     Enrich a contact using Apollo.io.
 
@@ -19,12 +21,27 @@ async def enrich_from_apollo(email: str) -> dict[str, Any] | None:
         email: Contact email address
 
     Returns:
-        Enriched contact data or None if not found
+        Enriched contact data
+
+    Raises:
+        ToolException: If enrichment fails or no data found
     """
-    return await apollo_client.enrich_contact(email)
+    try:
+        result = await apollo_client.enrich_contact(email)
+        if result is None:
+            raise ToolException(
+                f"No Apollo data found for email: {email}",
+            )
+        return result
+    except ToolException:
+        raise
+    except Exception as e:
+        raise ToolException(
+            f"Apollo enrichment failed for {email}: {e}",
+        ) from e
 
 
-async def scrape_company_website(domain: str) -> dict[str, Any] | None:
+async def scrape_company_website(domain: str) -> dict[str, Any]:
     """
     Scrape company website for about/overview info.
 
@@ -32,9 +49,21 @@ async def scrape_company_website(domain: str) -> dict[str, Any] | None:
         domain: Company domain
 
     Returns:
-        Dict with about_text or None if not found
+        Dict with about_text and other scraped info
+
+    Raises:
+        ToolException: If scraping fails
     """
-    return await web_scraper.scrape_company_info(domain)
+    try:
+        result = await web_scraper.scrape_company_info(domain)
+        if result is None:
+            # Return empty result instead of raising - scraping often fails gracefully
+            return {"domain": domain, "about_text": None, "status": "not_found"}
+        return result
+    except Exception as e:
+        raise ToolException(
+            f"Web scraping failed for {domain}: {e}",
+        ) from e
 
 
 async def scrape_company_news(domain: str) -> list[dict[str, Any]]:
@@ -45,10 +74,14 @@ async def scrape_company_news(domain: str) -> list[dict[str, Any]]:
         domain: Company domain
 
     Returns:
-        List of news items
+        List of news items (empty list if none found)
+
+    Raises:
+        ToolException: If all scraping attempts fail with errors
     """
     # Try common news/press paths
     news_paths = ["/news", "/press", "/newsroom", "/press-releases", "/blog"]
+    errors: list[str] = []
 
     for path in news_paths:
         url = f"https://{domain}{path}"
@@ -56,9 +89,11 @@ async def scrape_company_news(domain: str) -> list[dict[str, Any]]:
             news = await web_scraper.extract_news(url)
             if news:
                 return news
-        except Exception:
+        except Exception as e:
+            errors.append(f"{url}: {e}")
             continue
 
+    # Return empty list if no news found (not an error condition)
     return []
 
 

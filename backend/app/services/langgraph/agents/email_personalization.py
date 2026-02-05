@@ -11,7 +11,7 @@ Features:
 
 import re
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, cast
 
 from app.data.lead_schemas import Lead
@@ -390,8 +390,90 @@ class EmailPersonalizationAgent:
             yield {
                 "node": node_name,
                 "updates": event.get(node_name, {}) if node_name else {},
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
+
+    async def stream_tokens(
+        self,
+        lead: Lead,
+        research_brief: ResearchBrief | None = None,
+        persona: dict[str, Any] | None = None,
+        email_type: str = "pattern_interrupt",
+        sequence_step: int = 1,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """
+        Stream email generation with token-level granularity.
+
+        Uses astream_events(version="v2") for fine-grained events including:
+        - token: Individual LLM tokens as they're generated
+        - chain_start/chain_end: Node execution events
+        - custom: Developer-defined custom events
+
+        This is particularly useful for email generation where users want
+        to see the email being "typed out" in real-time.
+
+        Args:
+            lead: Target lead
+            research_brief: Research intelligence (optional)
+            persona: Persona data (optional)
+            email_type: Type of email
+            sequence_step: Current sequence step (1-4)
+
+        Yields:
+            Granular events including individual tokens
+        """
+        from datetime import timezone
+
+        if self._graph is None:
+            self._graph = self._build_graph()
+
+        compiled = self._graph.compile()
+        initial_state = self._prepare_initial_state(
+            lead, research_brief, persona, email_type, sequence_step
+        )
+
+        async for event in compiled.astream_events(
+            cast(Any, initial_state),
+            version="v2",
+        ):
+            event_type = event.get("event", "")
+            timestamp = datetime.now(timezone.utc).isoformat()
+
+            if event_type == "on_chat_model_stream":
+                # Token-level streaming from LLM
+                chunk = event.get("data", {}).get("chunk")
+                if chunk and hasattr(chunk, "content"):
+                    yield {
+                        "event_type": "token",
+                        "content": chunk.content,
+                        "run_id": event.get("run_id"),
+                        "timestamp": timestamp,
+                    }
+
+            elif event_type == "on_chain_start":
+                yield {
+                    "event_type": "chain_start",
+                    "name": event.get("name"),
+                    "run_id": event.get("run_id"),
+                    "timestamp": timestamp,
+                }
+
+            elif event_type == "on_chain_end":
+                yield {
+                    "event_type": "chain_end",
+                    "name": event.get("name"),
+                    "run_id": event.get("run_id"),
+                    "timestamp": timestamp,
+                }
+
+            elif event_type == "on_custom_event":
+                yield {
+                    "event_type": "custom",
+                    "name": event.get("name"),
+                    "data": event.get("data"),
+                    "run_id": event.get("run_id"),
+                    "timestamp": timestamp,
+                }
 
 
 # Singleton instance

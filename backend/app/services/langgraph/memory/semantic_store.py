@@ -25,7 +25,7 @@ Usage:
     )
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from app.core.config import settings
@@ -91,7 +91,7 @@ class SemanticMemory:
         self._memory_store[namespace] = self._memory_store.get(namespace, {})
         self._memory_store[namespace][key] = {
             "value": value,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
     async def get(
@@ -216,13 +216,13 @@ class SemanticMemory:
         """
         await self.put(
             namespace=("qualification", "patterns"),
-            key=f"{tier}_{persona}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
+            key=f"{tier}_{persona}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
             value={
                 "tier": tier,
                 "persona": persona,
                 "score_breakdown": score_breakdown,
                 "success_indicators": success_indicators or [],
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
 
@@ -267,14 +267,14 @@ class SemanticMemory:
         """
         await self.put(
             namespace=("email", "successes"),
-            key=f"{persona}_{email_type}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}",
+            key=f"{persona}_{email_type}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
             value={
                 "persona": persona,
                 "email_type": email_type,
                 "subject_line": subject_line,
                 "opening_hook": opening_hook,
                 "response_rate": response_rate,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
 

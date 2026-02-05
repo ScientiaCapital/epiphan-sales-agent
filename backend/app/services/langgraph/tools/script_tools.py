@@ -6,6 +6,8 @@ cold scripts (by vertical), and persona profiles.
 
 from typing import Any
 
+from langchain_core.tools import ToolException
+
 from app.data.persona_warm_scripts import get_warm_script_for_persona_trigger
 from app.data.personas import get_persona_by_id
 from app.data.schemas import PersonaType, TriggerType, Vertical
@@ -15,7 +17,7 @@ from app.data.scripts import get_script_by_vertical
 def get_warm_script(
     persona_id: str,
     trigger: str,
-) -> dict[str, Any] | None:
+) -> dict[str, Any]:
     """
     Get warm call script for persona and trigger.
 
@@ -24,18 +26,25 @@ def get_warm_script(
         trigger: Trigger type (demo_request, content_download, etc.)
 
     Returns:
-        Script dict or None if not found
+        Script dict
+
+    Raises:
+        ToolException: If persona/trigger combination not found
     """
     # Convert string IDs to enums
     try:
         persona_type = PersonaType(persona_id)
         trigger_type = TriggerType(trigger)
-    except ValueError:
-        return None
+    except ValueError as e:
+        raise ToolException(
+            f"Invalid persona '{persona_id}' or trigger '{trigger}': {e}",
+        ) from e
 
     script = get_warm_script_for_persona_trigger(persona_type, trigger_type)
     if not script:
-        return None
+        raise ToolException(
+            f"No warm script found for persona '{persona_id}' with trigger '{trigger}'",
+        )
 
     return {
         "persona_id": persona_id,
@@ -50,7 +59,7 @@ def get_warm_script(
     }
 
 
-def get_cold_script(vertical: str) -> dict[str, Any] | None:
+def get_cold_script(vertical: str) -> dict[str, Any]:
     """
     Get cold call script for vertical.
 
@@ -58,17 +67,24 @@ def get_cold_script(vertical: str) -> dict[str, Any] | None:
         vertical: Vertical ID (higher_ed, corporate, etc.)
 
     Returns:
-        Script dict or None if not found
+        Script dict
+
+    Raises:
+        ToolException: If vertical not found
     """
     # Convert string to enum
     try:
         vertical_enum = Vertical(vertical)
-    except ValueError:
-        return None
+    except ValueError as e:
+        raise ToolException(
+            f"Invalid vertical '{vertical}': {e}",
+        ) from e
 
     script = get_script_by_vertical(vertical_enum)
     if not script:
-        return None
+        raise ToolException(
+            f"No cold script found for vertical '{vertical}'",
+        )
 
     return {
         "vertical": script.vertical,  # Already a string due to use_enum_values
@@ -87,7 +103,7 @@ def get_cold_script(vertical: str) -> dict[str, Any] | None:
     }
 
 
-def get_persona_profile(persona_id: str) -> dict[str, Any] | None:
+def get_persona_profile(persona_id: str) -> dict[str, Any]:
     """
     Get full persona profile.
 
@@ -95,11 +111,16 @@ def get_persona_profile(persona_id: str) -> dict[str, Any] | None:
         persona_id: Persona ID
 
     Returns:
-        Persona profile dict or None if not found
+        Persona profile dict
+
+    Raises:
+        ToolException: If persona not found
     """
     persona = get_persona_by_id(persona_id)
     if not persona:
-        return None
+        raise ToolException(
+            f"Persona not found: {persona_id}",
+        )
 
     return {
         "id": persona.id,

@@ -77,13 +77,16 @@ backend/
 │       ├── langgraph/       # AI Agents
 │       │   ├── agents/      # LangGraph agents
 │       │   ├── tools/       # Agent tools
+│       │   ├── memory/      # Memory management (trimmer, semantic store)
+│       │   ├── middleware.py # Middleware layer (PII, rate limit, model select)
+│       │   ├── tracing.py   # LangSmith observability
 │       │   └── states.py    # State schemas
 │       ├── llm/             # LLM clients
 │       │   └── clients.py   # Multi-model router
 │       └── integrations/
 │           └── hubspot/     # HubSpot CRM client
 ├── tests/
-│   ├── unit/                # Unit tests (676+)
+│   ├── unit/                # Unit tests (891+)
 │   └── integration/         # Integration tests
 └── pyproject.toml
 ```
@@ -147,9 +150,11 @@ Five AI agents powered by LangGraph + Claude/Cerebras:
 - `POST /api/agents/emails/approve/{thread_id}` - Approve/reject pending email
 - `POST /api/agents/qualify` - Qualify lead against ICP criteria
 - `POST /api/agents/qualify/stream` - Qualify with streaming progress (SSE)
+- `POST /api/agents/emails/stream` - Token-level email streaming (SSE)
 
 ### Lead Management
 - `POST /api/batch/process` - Process multiple leads
+- `POST /api/batch/process/stream/tokens` - Single lead with token streaming (SSE)
 - `POST /api/leads/ingest` - Ingest leads from Lead Harvester (with phone enrichment)
 - `POST /api/leads/sync` - HubSpot sync
 - `GET /api/leads/prioritized` - Get leads by tier/persona
@@ -237,7 +242,40 @@ API Request → Immediate: employer phone only
 
 ---
 
-## Recent Work (2026-01-31) - Tech Debt Resolution
+## Recent Work (2026-02-05) - LangGraph Agent Polish Sprint
+**Branch**: `feature/agent-polish` → `feature/agent-orchestration`
+
+Completed 7-phase sprint implementing LangChain best practices:
+
+### Phase 1-4: Error Handling, Middleware, Memory Trimming, Synthesis (Prior Session)
+- ToolException pattern across all tools
+- Middleware layer: `PIIDetectionMiddleware`, `DynamicModelMiddleware`, `RateLimitMiddleware`
+- `MessageTrimmer` for short-term memory management
+- Master Orchestrator with parallel execution and review gates
+
+### Phase 5: Enhanced Token Streaming
+- `astream_events(version="v2")` for granular token streaming
+- New endpoints: `/api/agents/emails/stream`, `/api/batch/process/stream/tokens`
+- SSE (Server-Sent Events) for real-time progress updates
+- 12 new tests in `test_streaming.py`
+
+### Phase 6: Semantic Memory Activation
+- `SemanticMemory` class in `memory/semantic_store.py`
+- Pattern learning for Tier 1/2 qualification successes
+- Similar lead retrieval at research phase start
+- 14 new tests in `test_semantic_memory.py`
+
+### Phase 7: LangSmith Observability
+- `@trace_agent` decorator for automatic LangSmith tracing
+- `TracingMetrics` class for execution metrics
+- `with_tracing_context()` async context manager
+- 17 new tests in `test_tracing.py`
+
+**Code Quality**: 891 tests (886 passed, 5 skipped), 0 mypy errors, 0 ruff errors
+
+---
+
+## Previous Work (2026-01-31) - Tech Debt Resolution
 - **mypy Strict Mode Compliance** (COMMITTED: 44793c0)
   - Resolved all 174 mypy type errors
   - Added return type annotations to all `__init__` methods

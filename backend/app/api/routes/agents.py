@@ -474,3 +474,64 @@ async def approve_email(thread_id: str, approval: EmailApprovalInput) -> EmailAp
         follow_up_note=result.get("follow_up_note"),
         rejection_reason=result.get("rejection_reason"),
     )
+
+
+# =============================================================================
+# Token-Level Streaming Endpoint
+# =============================================================================
+
+
+@router.post("/emails/stream")
+async def stream_email_generation(request: EmailRequest) -> StreamingResponse:
+    """
+    Stream email generation with token-level granularity.
+
+    Returns Server-Sent Events (SSE) stream with fine-grained events:
+    - token: Individual LLM tokens as the email is generated
+    - chain_start/chain_end: Node execution events
+    - custom: Developer-defined custom events
+
+    This enables real-time UI with typing effect during email generation.
+
+    Example usage:
+        curl -N -X POST http://localhost:8001/api/agents/emails/stream \\
+            -H "Content-Type: application/json" \\
+            -d '{"lead": {"hubspot_id": "123", "email": "test@example.com"}}'
+    """
+    # Convert dict to ResearchBrief if provided
+    research_brief: ResearchBrief | None = None
+    if request.research_brief:
+        research_brief = {
+            "company_overview": request.research_brief.get("company_overview", ""),
+            "recent_news": request.research_brief.get("recent_news", []),
+            "talking_points": request.research_brief.get("talking_points", []),
+            "risk_factors": request.research_brief.get("risk_factors", []),
+            "linkedin_summary": request.research_brief.get("linkedin_summary"),
+        }
+
+    async def token_event_stream() -> AsyncGenerator[str, None]:
+        try:
+            async for event in email_personalization_agent.stream_tokens(
+                lead=request.lead,
+                research_brief=research_brief,
+                persona=request.persona,
+                email_type=request.email_type,
+                sequence_step=request.sequence_step,
+            ):
+                yield f"data: {json.dumps(event)}\n\n"
+
+            # Send completion event
+            yield f"data: {json.dumps({'event_type': 'complete'})}\n\n"
+
+        except Exception as e:
+            error_event = {"event_type": "error", "error": str(e)}
+            yield f"data: {json.dumps(error_event)}\n\n"
+
+    return StreamingResponse(
+        token_event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )

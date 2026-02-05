@@ -1,5 +1,7 @@
 """Tests for script selection tools."""
 
+import pytest
+from langchain_core.tools import ToolException
 
 
 class TestGetWarmScript:
@@ -15,13 +17,14 @@ class TestGetWarmScript:
         # ACQP framework: acknowledge, connect, qualify, propose
         assert "acknowledge" in result or "connect" in result
 
-    def test_returns_none_for_invalid_persona(self):
-        """Test returning None for invalid persona."""
+    def test_raises_tool_exception_for_invalid_persona(self):
+        """Test raising ToolException for invalid persona."""
         from app.services.langgraph.tools.script_tools import get_warm_script
 
-        result = get_warm_script("invalid_persona", "demo_request")
+        with pytest.raises(ToolException) as exc_info:
+            get_warm_script("invalid_persona", "demo_request")
 
-        assert result is None
+        assert "Invalid persona" in str(exc_info.value)
 
     def test_returns_script_with_objection_handlers(self):
         """Test that script includes objection handlers."""
@@ -60,13 +63,14 @@ class TestGetColdScript:
         assert "pattern_interrupt" in result
         assert "value_hook" in result
 
-    def test_returns_none_for_invalid_vertical(self):
-        """Test returning None for invalid vertical."""
+    def test_raises_tool_exception_for_invalid_vertical(self):
+        """Test raising ToolException for invalid vertical."""
         from app.services.langgraph.tools.script_tools import get_cold_script
 
-        result = get_cold_script("invalid_vertical")
+        with pytest.raises(ToolException) as exc_info:
+            get_cold_script("invalid_vertical")
 
-        assert result is None
+        assert "Invalid vertical" in str(exc_info.value)
 
     def test_includes_objection_pivots(self):
         """Test that script includes objection pivots."""
@@ -93,13 +97,14 @@ class TestGetPersonaProfile:
         assert "pain_points" in result
         assert "objections" in result
 
-    def test_returns_none_for_invalid_persona(self):
-        """Test returning None for invalid persona."""
+    def test_raises_tool_exception_for_invalid_persona(self):
+        """Test raising ToolException for invalid persona."""
         from app.services.langgraph.tools.script_tools import get_persona_profile
 
-        result = get_persona_profile("invalid_xyz")
+        with pytest.raises(ToolException) as exc_info:
+            get_persona_profile("invalid_xyz")
 
-        assert result is None
+        assert "Persona not found" in str(exc_info.value)
 
     def test_profile_has_discovery_questions(self):
         """Test that profile includes discovery questions."""

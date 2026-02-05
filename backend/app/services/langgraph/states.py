@@ -217,6 +217,23 @@ class PhaseResult(TypedDict):
     data: dict[str, Any]
 
 
+class SynthesisResult(TypedDict):
+    """Result from synthesis node after research phase.
+
+    The synthesis node analyzes research findings and identifies:
+    - Intelligence gaps that need filling
+    - Contact quality assessment
+    - Confidence in collected data
+    """
+
+    company_summary: str | None  # Condensed company overview
+    qualification_tier: str | None  # Extracted tier
+    contact_quality: str  # "high" | "medium" | "low"
+    intelligence_gaps: list[str]  # Missing information
+    confidence_score: float  # 0.0-1.0 overall confidence
+    recommended_actions: list[str]  # Next steps based on gaps
+
+
 class OrchestratorState(TypedDict):
     """State for Master Orchestrator Agent.
 
@@ -244,6 +261,9 @@ class OrchestratorState(TypedDict):
     research_brief: ResearchBrief | None
     qualification_result: dict[str, Any] | None  # ICP scoring result
     enrichment_data: dict[str, Any] | None  # Apollo + scraped data
+
+    # === Synthesis Result (after research, before gate 1) ===
+    synthesis: SynthesisResult | None
 
     # === Gate 1 Decision ===
     gate_1_decision: GateDecision | None

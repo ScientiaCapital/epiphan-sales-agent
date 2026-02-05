@@ -12,6 +12,7 @@ Architecture based on:
 
 import asyncio
 import time
+from collections.abc import AsyncGenerator
 from typing import Any, Literal, cast
 
 from app.data.lead_schemas import Lead
@@ -21,13 +22,16 @@ from app.services.langgraph.agents.email_personalization import (
 from app.services.langgraph.agents.lead_research import lead_research_agent
 from app.services.langgraph.agents.qualification import QualificationAgent
 from app.services.langgraph.agents.script_selection import script_selection_agent
+from app.services.langgraph.memory import semantic_memory
 from app.services.langgraph.states import (
     GateDecision,
     OrchestratorState,
     PhaseResult,
     QualificationTier,
     ResearchBrief,
+    SynthesisResult,
 )
+from app.services.langgraph.tracing import trace_agent, tracing_metrics
 from langgraph.graph import END, StateGraph
 
 
@@ -52,12 +56,13 @@ class MasterOrchestratorAgent:
     """
 
     def __init__(self) -> None:
-        """Initialize the orchestrator with sub-agents."""
+        """Initialize the orchestrator with sub-agents and memory."""
         self._graph: StateGraph[OrchestratorState] | None = None
         self._research_agent = lead_research_agent
         self._qualification_agent = QualificationAgent()
         self._script_agent = script_selection_agent
         self._email_agent = email_personalization_agent
+        self._memory = semantic_memory
 
     def _build_graph(self) -> StateGraph[OrchestratorState]:
         """Build the LangGraph state graph with parallel nodes."""
@@ -65,6 +70,9 @@ class MasterOrchestratorAgent:
 
         # === Phase 1: Parallel Research ===
         graph.add_node("parallel_research", self._parallel_research_node)
+
+        # === Synthesis Node (NEW): Analyze research and identify gaps ===
+        graph.add_node("synthesis", self._synthesis_node)
 
         # === Gate 1: Data Quality ===
         graph.add_node("review_gate_1", self._review_gate_1_node)
@@ -83,7 +91,8 @@ class MasterOrchestratorAgent:
 
         # === Define Edges ===
         graph.set_entry_point("parallel_research")
-        graph.add_edge("parallel_research", "review_gate_1")
+        graph.add_edge("parallel_research", "synthesis")
+        graph.add_edge("synthesis", "review_gate_1")
 
         # Conditional routing based on tier after gate 1
         graph.add_conditional_edges(
@@ -126,10 +135,27 @@ class MasterOrchestratorAgent:
 
         This is the key throughput optimization - these 3 operations
         are independent and can execute concurrently.
+
+        Also queries semantic memory for similar lead patterns to
+        inform research and qualification strategies.
         """
         start_time = time.time()
         lead = state["lead"]
         errors: list[str] = []
+
+        # Query semantic memory for similar lead patterns
+        # This helps identify successful approaches for similar leads
+        similar_patterns: list[dict[str, Any]] = []
+        try:
+            query = f"{lead.company or ''} {lead.title or ''} {lead.industry or ''}".strip()
+            if query:
+                similar_patterns = await self._memory.find_similar_patterns(
+                    query=query,
+                    limit=3,
+                )
+        except Exception:
+            # Memory query failure is non-fatal
+            pass
 
         # Launch all 3 tasks in parallel
         research_task = self._run_research_agent(lead)
@@ -170,7 +196,11 @@ class MasterOrchestratorAgent:
             "status": "success" if not errors else "partial",
             "duration_ms": duration_ms,
             "errors": errors,
-            "data": {"research": bool(research_result), "qualification": bool(qualification_result)},
+            "data": {
+                "research": bool(research_result),
+                "qualification": bool(qualification_result),
+                "similar_patterns_found": len(similar_patterns),
+            },
         }
 
         return {
@@ -184,6 +214,226 @@ class MasterOrchestratorAgent:
             "phase_results": [phase_result],
             "errors": errors,
         }
+
+    async def _synthesis_node(
+        self, state: OrchestratorState
+    ) -> dict[str, Any]:
+        """
+        Synthesize research findings and identify intelligence gaps.
+
+        This node runs after parallel research to:
+        1. Consolidate findings from research and qualification
+        2. Identify missing information (gaps)
+        3. Assess contact quality
+        4. Calculate confidence score
+
+        The synthesis helps prioritize outreach approach and identifies
+        data gaps that may need manual research.
+        """
+        start_time = time.time()
+
+        research_brief = state.get("research_brief")
+        qualification_result = state.get("qualification_result")
+        enrichment_data = state.get("enrichment_data")
+        tier = state.get("tier")
+        has_phone = state.get("has_phone")
+
+        # Identify intelligence gaps
+        intelligence_gaps: list[str] = []
+
+        if not research_brief:
+            intelligence_gaps.append("missing_research_brief")
+        elif not research_brief.get("company_overview"):
+            intelligence_gaps.append("missing_company_overview")
+
+        if not qualification_result:
+            intelligence_gaps.append("missing_qualification")
+        elif not qualification_result.get("persona_match"):
+            intelligence_gaps.append("missing_persona_match")
+
+        if not enrichment_data:
+            intelligence_gaps.append("missing_enrichment_data")
+        else:
+            if not enrichment_data.get("title"):
+                intelligence_gaps.append("missing_title")
+            if not enrichment_data.get("industry"):
+                intelligence_gaps.append("missing_industry")
+
+        # PHONES ARE GOLD - flag missing phone prominently
+        if not has_phone:
+            intelligence_gaps.append("missing_phone_critical")
+
+        # Assess contact quality
+        contact_quality = self._assess_contact_quality(
+            enrichment_data=enrichment_data,
+            qualification_result=qualification_result,
+            has_phone=has_phone,
+        )
+
+        # Calculate confidence score based on data completeness
+        confidence_score = self._calculate_synthesis_confidence(
+            research_brief=research_brief,
+            qualification_result=qualification_result,
+            enrichment_data=enrichment_data,
+            intelligence_gaps=intelligence_gaps,
+        )
+
+        # Generate recommended actions based on gaps
+        recommended_actions = self._generate_recommended_actions(
+            intelligence_gaps=intelligence_gaps,
+            tier=tier,
+            contact_quality=contact_quality,
+        )
+
+        synthesis: SynthesisResult = {
+            "company_summary": (
+                research_brief.get("company_overview", "")[:500]
+                if research_brief else None
+            ),
+            "qualification_tier": tier.value if tier else None,
+            "contact_quality": contact_quality,
+            "intelligence_gaps": intelligence_gaps,
+            "confidence_score": confidence_score,
+            "recommended_actions": recommended_actions,
+        }
+
+        duration_ms = (time.time() - start_time) * 1000
+
+        phase_result: PhaseResult = {
+            "phase_name": "synthesis",
+            "status": "success",
+            "duration_ms": duration_ms,
+            "errors": [],
+            "data": {
+                "gaps_count": len(intelligence_gaps),
+                "contact_quality": contact_quality,
+                "confidence": confidence_score,
+            },
+        }
+
+        existing_phases = state.get("phase_results", [])
+
+        return {
+            "synthesis": synthesis,
+            "current_phase": "gate_1",
+            "phase_results": existing_phases + [phase_result],
+        }
+
+    def _assess_contact_quality(
+        self,
+        enrichment_data: dict[str, Any] | None,
+        qualification_result: dict[str, Any] | None,
+        has_phone: bool,
+    ) -> str:
+        """
+        Assess contact quality based on available data.
+
+        Returns: "high", "medium", or "low"
+        """
+        score = 0
+
+        # Enrichment data quality
+        if enrichment_data:
+            if enrichment_data.get("title"):
+                score += 2
+            if enrichment_data.get("linkedin_url"):
+                score += 1
+            if enrichment_data.get("company"):
+                score += 1
+
+        # Phone is critical for sales
+        if has_phone:
+            score += 3
+
+        # Qualification data
+        if qualification_result:
+            if qualification_result.get("persona_match"):
+                score += 2
+            tier = qualification_result.get("tier")
+            if tier and tier != "not_icp":
+                score += 1
+
+        # Score thresholds
+        if score >= 8:
+            return "high"
+        elif score >= 4:
+            return "medium"
+        else:
+            return "low"
+
+    def _calculate_synthesis_confidence(
+        self,
+        research_brief: ResearchBrief | None,
+        qualification_result: dict[str, Any] | None,
+        enrichment_data: dict[str, Any] | None,
+        intelligence_gaps: list[str],
+    ) -> float:
+        """
+        Calculate overall confidence in synthesized data.
+
+        Returns: 0.0 to 1.0 confidence score
+        """
+        # Start with base confidence
+        confidence = 0.5
+
+        # Research brief adds confidence
+        if research_brief:
+            confidence += 0.15
+            if research_brief.get("talking_points"):
+                confidence += 0.1
+
+        # Qualification adds confidence
+        if qualification_result:
+            confidence += 0.15
+
+        # Enrichment adds confidence
+        if enrichment_data:
+            confidence += 0.1
+
+        # Deduct for each gap
+        gap_penalty = len(intelligence_gaps) * 0.05
+        confidence -= gap_penalty
+
+        # Clamp to valid range
+        return max(0.0, min(1.0, confidence))
+
+    def _generate_recommended_actions(
+        self,
+        intelligence_gaps: list[str],
+        tier: QualificationTier | None,
+        contact_quality: str,
+    ) -> list[str]:
+        """
+        Generate recommended next actions based on synthesis.
+        """
+        actions: list[str] = []
+
+        # Phone-related actions (PHONES ARE GOLD!)
+        if "missing_phone_critical" in intelligence_gaps:
+            actions.append("Manual phone lookup via LinkedIn/company website")
+            actions.append("Use Apollo phone reveal if budget permits")
+
+        # Title-related actions
+        if "missing_title" in intelligence_gaps:
+            actions.append("Verify job title via LinkedIn")
+
+        # Research gaps
+        if "missing_research_brief" in intelligence_gaps:
+            actions.append("Conduct manual company research")
+
+        # Contact quality actions
+        if contact_quality == "low":
+            actions.append("Consider re-enrichment with alternative sources")
+
+        # Tier-based actions
+        if tier == QualificationTier.TIER_1:
+            actions.insert(0, "PRIORITY: Fast-track to outreach sequence")
+        elif tier == QualificationTier.TIER_2:
+            actions.append("Standard sequence - good fit")
+        elif tier == QualificationTier.NOT_ICP:
+            actions.append("Archive - does not meet ICP criteria")
+
+        return actions
 
     async def _review_gate_1_node(
         self, state: OrchestratorState
@@ -356,22 +606,27 @@ class MasterOrchestratorAgent:
 
     async def _sync_node(self, state: OrchestratorState) -> dict[str, Any]:
         """
-        Sync results to HubSpot CRM.
+        Sync results to HubSpot CRM and store successful patterns.
 
         Note: Actual HubSpot sync is handled by the caller or a separate
         service - this node prepares the data for sync.
+
+        For Tier 1 and Tier 2 leads, stores the qualification pattern
+        in semantic memory for future pattern matching.
         """
         start_time = time.time()
 
         # Prepare HubSpot update payload
         tier = state.get("tier")
+        persona = self._extract_persona(state.get("qualification_result"))
+
         sync_result = {
             "lead_id": state["lead"].hubspot_id,
             "updates": {
                 "tier": tier.value if tier else None,
                 "is_atl": state.get("is_atl"),
                 "has_phone": state.get("has_phone"),
-                "persona": self._extract_persona(state.get("qualification_result")),
+                "persona": persona,
             },
             "assets": {
                 "has_script": bool(state.get("script_result")),
@@ -380,6 +635,34 @@ class MasterOrchestratorAgent:
             },
             "status": "ready_for_sync",
         }
+
+        # Store successful patterns in semantic memory for learning
+        # Only store Tier 1 and Tier 2 as successful patterns
+        if tier in (QualificationTier.TIER_1, QualificationTier.TIER_2):
+            try:
+                qualification_result = state.get("qualification_result")
+                score_breakdown = qualification_result.get("score_breakdown", {}) if qualification_result else {}
+
+                # Identify success indicators based on what we know
+                success_indicators: list[str] = []
+                if state.get("has_phone"):
+                    success_indicators.append("has_phone")
+                if state.get("is_atl"):
+                    success_indicators.append("is_atl_decision_maker")
+                if state.get("email_result"):
+                    success_indicators.append("email_generated")
+                if state.get("script_result"):
+                    success_indicators.append("script_generated")
+
+                await self._memory.save_qualification_pattern(
+                    tier=tier.value,
+                    persona=persona or "unknown",
+                    score_breakdown=score_breakdown,
+                    success_indicators=success_indicators,
+                )
+            except Exception:
+                # Memory save failure is non-fatal
+                pass
 
         duration_ms = (time.time() - start_time) * 1000
 
@@ -570,6 +853,7 @@ class MasterOrchestratorAgent:
     # Public Interface
     # =========================================================================
 
+    @trace_agent("master_orchestrator", metadata={"version": "1.0"})
     async def run(
         self,
         lead: Lead,
@@ -601,6 +885,7 @@ class MasterOrchestratorAgent:
             "research_brief": None,
             "qualification_result": None,
             "enrichment_data": None,
+            "synthesis": None,
             "gate_1_decision": None,
             "script_result": None,
             "email_result": None,
@@ -623,13 +908,24 @@ class MasterOrchestratorAgent:
         total_duration_ms = (time.time() - start_time) * 1000
 
         result_tier = result.get("tier")
+        tier_value = result_tier.value if result_tier else None
+
+        # Record metrics for observability
+        tracing_metrics.record(
+            agent_name="master_orchestrator",
+            duration_ms=total_duration_ms,
+            success=not result.get("errors"),
+            tier=tier_value,
+        )
+
         return {
             "lead_id": lead.hubspot_id,
-            "tier": result_tier.value if result_tier else None,
+            "tier": tier_value,
             "is_atl": result.get("is_atl"),
             "has_phone": result.get("has_phone"),
             "research_brief": result.get("research_brief"),
             "qualification_result": result.get("qualification_result"),
+            "synthesis": result.get("synthesis"),
             "script_result": result.get("script_result"),
             "email_result": result.get("email_result"),
             "competitor_intel": result.get("competitor_intel"),
@@ -642,6 +938,195 @@ class MasterOrchestratorAgent:
             "total_duration_ms": total_duration_ms,
             "errors": result.get("errors", []),
         }
+
+    async def stream(
+        self,
+        lead: Lead,
+        process_config: dict[str, Any] | None = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """
+        Stream orchestration progress with node-level updates.
+
+        Yields progress events as each node completes, useful for
+        real-time UI updates via SSE.
+
+        Args:
+            lead: Lead to process
+            process_config: Optional processing configuration
+
+        Yields:
+            Progress events with node name, updates, and timestamp
+        """
+        from datetime import datetime, timezone
+
+        # Build graph if needed
+        if self._graph is None:
+            self._graph = self._build_graph()
+
+        # Compile the graph
+        compiled = self._graph.compile()
+
+        # Initial state
+        initial_state: OrchestratorState = {
+            "lead": lead,
+            "process_config": process_config or {},
+            "research_brief": None,
+            "qualification_result": None,
+            "enrichment_data": None,
+            "synthesis": None,
+            "gate_1_decision": None,
+            "script_result": None,
+            "email_result": None,
+            "competitor_intel": None,
+            "gate_2_decision": None,
+            "hubspot_sync_result": None,
+            "current_phase": "research",
+            "phase_results": [],
+            "total_duration_ms": 0.0,
+            "errors": [],
+            "tier": None,
+            "has_phone": False,
+            "is_atl": False,
+        }
+
+        # Stream with updates mode for node-level events
+        async for event in compiled.astream(
+            cast(Any, initial_state),
+            stream_mode="updates",
+        ):
+            # Extract node name from event keys
+            node_name = list(event.keys())[0] if event else None
+
+            yield {
+                "event_type": "node_update",
+                "node": node_name,
+                "updates": event.get(node_name, {}) if node_name else {},
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+
+    async def stream_tokens(
+        self,
+        lead: Lead,
+        process_config: dict[str, Any] | None = None,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """
+        Stream orchestration with token-level granularity.
+
+        Uses astream_events(version="v2") for fine-grained events including:
+        - on_chat_model_stream: Individual LLM tokens
+        - on_chain_start/end: Chain execution events
+        - on_tool_start/end: Tool execution events
+        - on_custom_event: Developer-defined events
+
+        This is useful for real-time UI with typing indicators and
+        progress animations during LLM generation.
+
+        Args:
+            lead: Lead to process
+            process_config: Optional processing configuration
+
+        Yields:
+            Granular events including tokens, tool calls, and custom events
+        """
+        from datetime import datetime, timezone
+
+        # Build graph if needed
+        if self._graph is None:
+            self._graph = self._build_graph()
+
+        # Compile the graph
+        compiled = self._graph.compile()
+
+        # Initial state
+        initial_state: OrchestratorState = {
+            "lead": lead,
+            "process_config": process_config or {},
+            "research_brief": None,
+            "qualification_result": None,
+            "enrichment_data": None,
+            "synthesis": None,
+            "gate_1_decision": None,
+            "script_result": None,
+            "email_result": None,
+            "competitor_intel": None,
+            "gate_2_decision": None,
+            "hubspot_sync_result": None,
+            "current_phase": "research",
+            "phase_results": [],
+            "total_duration_ms": 0.0,
+            "errors": [],
+            "tier": None,
+            "has_phone": False,
+            "is_atl": False,
+        }
+
+        # Use astream_events for token-level streaming
+        async for event in compiled.astream_events(
+            cast(Any, initial_state),
+            version="v2",
+        ):
+            event_type = event.get("event", "")
+            timestamp = datetime.now(timezone.utc).isoformat()
+
+            if event_type == "on_chat_model_stream":
+                # Token-level streaming from LLM
+                chunk = event.get("data", {}).get("chunk")
+                if chunk and hasattr(chunk, "content"):
+                    yield {
+                        "event_type": "token",
+                        "content": chunk.content,
+                        "run_id": event.get("run_id"),
+                        "timestamp": timestamp,
+                    }
+
+            elif event_type == "on_chain_start":
+                # Node/chain started
+                yield {
+                    "event_type": "chain_start",
+                    "name": event.get("name"),
+                    "run_id": event.get("run_id"),
+                    "parent_ids": event.get("parent_ids", []),
+                    "timestamp": timestamp,
+                }
+
+            elif event_type == "on_chain_end":
+                # Node/chain completed
+                yield {
+                    "event_type": "chain_end",
+                    "name": event.get("name"),
+                    "run_id": event.get("run_id"),
+                    "timestamp": timestamp,
+                }
+
+            elif event_type == "on_tool_start":
+                # Tool execution started
+                yield {
+                    "event_type": "tool_start",
+                    "name": event.get("name"),
+                    "run_id": event.get("run_id"),
+                    "input": event.get("data", {}).get("input"),
+                    "timestamp": timestamp,
+                }
+
+            elif event_type == "on_tool_end":
+                # Tool execution completed
+                yield {
+                    "event_type": "tool_end",
+                    "name": event.get("name"),
+                    "run_id": event.get("run_id"),
+                    "output": event.get("data", {}).get("output"),
+                    "timestamp": timestamp,
+                }
+
+            elif event_type == "on_custom_event":
+                # Custom developer-defined events
+                yield {
+                    "event_type": "custom",
+                    "name": event.get("name"),
+                    "data": event.get("data"),
+                    "run_id": event.get("run_id"),
+                    "timestamp": timestamp,
+                }
 
 
 # Singleton instance

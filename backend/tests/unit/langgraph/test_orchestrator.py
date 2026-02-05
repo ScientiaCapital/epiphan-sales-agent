@@ -525,6 +525,199 @@ class TestHelperMethods:
         assert result == "AV Director"
 
 
+
+
+class TestSynthesisNode:
+    """Tests for the synthesis node."""
+
+    @pytest.fixture
+    def agent(self) -> MasterOrchestratorAgent:
+        """Create agent instance."""
+        return MasterOrchestratorAgent()
+
+    @pytest.mark.asyncio
+    async def test_synthesis_identifies_gaps_missing_phone(
+        self, agent: MasterOrchestratorAgent, sample_lead: Lead
+    ) -> None:
+        """Test that synthesis identifies missing phone as critical gap."""
+        state = {
+            "lead": sample_lead,
+            "research_brief": {"company_overview": "Test company", "talking_points": []},
+            "qualification_result": {"persona_match": "AV Director", "tier": "tier_1"},
+            "enrichment_data": {"title": "AV Director"},
+            "tier": QualificationTier.TIER_1,
+            "has_phone": False,
+            "phase_results": [],
+        }
+
+        result = await agent._synthesis_node(state)
+
+        assert "synthesis" in result
+        assert "missing_phone_critical" in result["synthesis"]["intelligence_gaps"]
+        # Should recommend phone lookup
+        actions = result["synthesis"]["recommended_actions"]
+        assert any("phone" in a.lower() for a in actions)
+
+    @pytest.mark.asyncio
+    async def test_synthesis_calculates_contact_quality_high(
+        self, agent: MasterOrchestratorAgent, sample_lead: Lead
+    ) -> None:
+        """Test high contact quality calculation."""
+        state = {
+            "lead": sample_lead,
+            "research_brief": {"company_overview": "Test", "talking_points": ["Point 1"]},
+            "qualification_result": {"persona_match": "AV Director", "tier": "tier_1"},
+            "enrichment_data": {
+                "title": "AV Director",
+                "linkedin_url": "https://linkedin.com/in/test",
+                "company": "State University",
+            },
+            "tier": QualificationTier.TIER_1,
+            "has_phone": True,
+            "phase_results": [],
+        }
+
+        result = await agent._synthesis_node(state)
+
+        assert result["synthesis"]["contact_quality"] == "high"
+
+    @pytest.mark.asyncio
+    async def test_synthesis_calculates_contact_quality_low(
+        self, agent: MasterOrchestratorAgent, sample_lead: Lead
+    ) -> None:
+        """Test low contact quality calculation."""
+        state = {
+            "lead": sample_lead,
+            "research_brief": None,
+            "qualification_result": None,
+            "enrichment_data": None,
+            "tier": None,
+            "has_phone": False,
+            "phase_results": [],
+        }
+
+        result = await agent._synthesis_node(state)
+
+        assert result["synthesis"]["contact_quality"] == "low"
+
+    @pytest.mark.asyncio
+    async def test_synthesis_identifies_multiple_gaps(
+        self, agent: MasterOrchestratorAgent, sample_lead: Lead
+    ) -> None:
+        """Test identifying multiple intelligence gaps."""
+        state = {
+            "lead": sample_lead,
+            "research_brief": None,
+            "qualification_result": None,
+            "enrichment_data": {"company": "Test"},  # Missing title and industry
+            "tier": None,
+            "has_phone": False,
+            "phase_results": [],
+        }
+
+        result = await agent._synthesis_node(state)
+
+        gaps = result["synthesis"]["intelligence_gaps"]
+        assert "missing_research_brief" in gaps
+        assert "missing_qualification" in gaps
+        assert "missing_phone_critical" in gaps
+        assert "missing_title" in gaps
+        assert "missing_industry" in gaps
+
+    @pytest.mark.asyncio
+    async def test_synthesis_confidence_score_calculation(
+        self, agent: MasterOrchestratorAgent, sample_lead: Lead
+    ) -> None:
+        """Test confidence score calculation."""
+        # High data quality should yield higher confidence
+        high_quality_state = {
+            "lead": sample_lead,
+            "research_brief": {"company_overview": "Test", "talking_points": ["Point"]},
+            "qualification_result": {"persona_match": "AV Director"},
+            "enrichment_data": {"title": "AV Director"},
+            "tier": QualificationTier.TIER_1,
+            "has_phone": True,
+            "phase_results": [],
+        }
+
+        # Low data quality should yield lower confidence
+        low_quality_state = {
+            "lead": sample_lead,
+            "research_brief": None,
+            "qualification_result": None,
+            "enrichment_data": None,
+            "tier": None,
+            "has_phone": False,
+            "phase_results": [],
+        }
+
+        high_result = await agent._synthesis_node(high_quality_state)
+        low_result = await agent._synthesis_node(low_quality_state)
+
+        assert high_result["synthesis"]["confidence_score"] > low_result["synthesis"]["confidence_score"]
+
+    @pytest.mark.asyncio
+    async def test_synthesis_tier_1_priority_action(
+        self, agent: MasterOrchestratorAgent, sample_lead: Lead
+    ) -> None:
+        """Test that Tier 1 leads get priority action recommendation."""
+        state = {
+            "lead": sample_lead,
+            "research_brief": {"company_overview": "Test"},
+            "qualification_result": {"persona_match": "AV Director"},
+            "enrichment_data": {"title": "AV Director"},
+            "tier": QualificationTier.TIER_1,
+            "has_phone": True,
+            "phase_results": [],
+        }
+
+        result = await agent._synthesis_node(state)
+
+        actions = result["synthesis"]["recommended_actions"]
+        # First action should be priority for Tier 1
+        assert "PRIORITY" in actions[0] or "priority" in actions[0].lower()
+
+    @pytest.mark.asyncio
+    async def test_synthesis_not_icp_archive_action(
+        self, agent: MasterOrchestratorAgent, sample_lead: Lead
+    ) -> None:
+        """Test that NOT_ICP leads get archive recommendation."""
+        state = {
+            "lead": sample_lead,
+            "research_brief": {"company_overview": "Test"},
+            "qualification_result": {},
+            "enrichment_data": {},
+            "tier": QualificationTier.NOT_ICP,
+            "has_phone": False,
+            "phase_results": [],
+        }
+
+        result = await agent._synthesis_node(state)
+
+        actions = result["synthesis"]["recommended_actions"]
+        assert any("archive" in a.lower() for a in actions)
+
+    @pytest.mark.asyncio
+    async def test_synthesis_adds_phase_result(
+        self, agent: MasterOrchestratorAgent, sample_lead: Lead
+    ) -> None:
+        """Test that synthesis adds phase result to tracking."""
+        state = {
+            "lead": sample_lead,
+            "research_brief": {},
+            "qualification_result": {},
+            "enrichment_data": {},
+            "tier": QualificationTier.TIER_2,
+            "has_phone": False,
+            "phase_results": [],
+        }
+
+        result = await agent._synthesis_node(state)
+
+        assert len(result["phase_results"]) == 1
+        assert result["phase_results"][0]["phase_name"] == "synthesis"
+        assert result["phase_results"][0]["status"] == "success"
+
 class TestCompetitorCheck:
     """Tests for competitor signal detection."""
 

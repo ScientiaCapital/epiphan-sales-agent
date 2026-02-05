@@ -6,10 +6,12 @@ differentiators, and get pre-written claim responses.
 
 from typing import Any
 
+from langchain_core.tools import ToolException
+
 from app.data.competitors import COMPETITORS, get_competitor_by_id
 
 
-def get_battlecard(competitor_name: str) -> dict[str, Any] | None:
+def get_battlecard(competitor_name: str) -> dict[str, Any]:
     """
     Get battlecard for a competitor by name.
 
@@ -19,7 +21,10 @@ def get_battlecard(competitor_name: str) -> dict[str, Any] | None:
         competitor_name: Full or partial competitor name
 
     Returns:
-        Battlecard dict or None if not found
+        Battlecard dict
+
+    Raises:
+        ToolException: If competitor not found
     """
     name_lower = competitor_name.lower().strip()
 
@@ -38,7 +43,10 @@ def get_battlecard(competitor_name: str) -> dict[str, Any] | None:
         if name_lower in competitor.company.lower():
             return _battlecard_to_dict(competitor)
 
-    return None
+    raise ToolException(
+        f"No battlecard found for competitor: {competitor_name}. "
+        f"Available competitors: {', '.join(c.name for c in COMPETITORS[:5])}...",
+    )
 
 
 def search_differentiators(
@@ -54,10 +62,15 @@ def search_differentiators(
 
     Returns:
         List of matching differentiators
+
+    Raises:
+        ToolException: If competitor not found
     """
     competitor = get_competitor_by_id(competitor_id)
     if not competitor:
-        return []
+        raise ToolException(
+            f"Competitor not found: {competitor_id}",
+        )
 
     keyword_lower = keyword.lower()
     matches = []
@@ -90,10 +103,15 @@ def get_claim_responses(
 
     Returns:
         List of claim/response dicts
+
+    Raises:
+        ToolException: If competitor not found
     """
     competitor = get_competitor_by_id(competitor_id)
     if not competitor:
-        return []
+        raise ToolException(
+            f"Competitor not found: {competitor_id}",
+        )
 
     responses = []
     for claim in competitor.claims:
