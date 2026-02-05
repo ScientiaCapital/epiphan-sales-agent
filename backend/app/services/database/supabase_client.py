@@ -366,6 +366,169 @@ class SupabaseClient:
         result = query.order("scheduled_at").limit(limit).execute()
         return result.data or []
 
+    # =========================================================================
+    # Call Outcome Operations (BDR call tracking)
+    # =========================================================================
+
+    def create_call_outcome(self, outcome_data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Insert a call outcome record.
+
+        Args:
+            outcome_data: Call outcome fields
+
+        Returns:
+            Inserted record
+        """
+        result = self.client.table("call_outcomes").insert(outcome_data).execute()
+        return cast(dict[str, Any], result.data[0]) if result.data else {}
+
+    def get_outcomes_by_lead(
+        self, lead_id: str, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """Get all call outcomes for a lead, most recent first."""
+        result = (
+            self.client.table("call_outcomes")
+            .select("*")
+            .eq("lead_id", lead_id)
+            .order("called_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data or []
+
+    def get_outcomes_by_date(self, date_str: str) -> list[dict[str, Any]]:
+        """
+        Get all call outcomes for a specific date.
+
+        Args:
+            date_str: Date in YYYY-MM-DD format
+
+        Returns:
+            List of call outcome records
+        """
+        start = f"{date_str}T00:00:00+00:00"
+        end = f"{date_str}T23:59:59+00:00"
+        result = (
+            self.client.table("call_outcomes")
+            .select("*")
+            .gte("called_at", start)
+            .lte("called_at", end)
+            .order("called_at", desc=True)
+            .execute()
+        )
+        return result.data or []
+
+    def get_outcomes_by_date_range(
+        self, start_date: str, end_date: str
+    ) -> list[dict[str, Any]]:
+        """
+        Get call outcomes within a date range.
+
+        Args:
+            start_date: Start date YYYY-MM-DD
+            end_date: End date YYYY-MM-DD
+
+        Returns:
+            List of call outcome records
+        """
+        start = f"{start_date}T00:00:00+00:00"
+        end = f"{end_date}T23:59:59+00:00"
+        result = (
+            self.client.table("call_outcomes")
+            .select("*")
+            .gte("called_at", start)
+            .lte("called_at", end)
+            .order("called_at", desc=True)
+            .execute()
+        )
+        return result.data or []
+
+    def get_pending_follow_ups(
+        self, before_date: str, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        """
+        Get call outcomes with pending follow-ups on or before a date.
+
+        Args:
+            before_date: Include follow-ups up to this date (YYYY-MM-DD)
+            limit: Max results
+
+        Returns:
+            List of call outcomes with follow_up_date set
+        """
+        result = (
+            self.client.table("call_outcomes")
+            .select("*")
+            .not_.is_("follow_up_date", "null")
+            .lte("follow_up_date", before_date)
+            .order("follow_up_date")
+            .limit(limit)
+            .execute()
+        )
+        return result.data or []
+
+    def get_unsynced_call_outcomes(self, limit: int = 100) -> list[dict[str, Any]]:
+        """Get call outcomes not yet synced to HubSpot."""
+        result = (
+            self.client.table("call_outcomes")
+            .select("*")
+            .eq("synced_to_hubspot", False)
+            .order("called_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data or []
+
+    def mark_outcome_synced(
+        self, outcome_id: str, hubspot_engagement_id: str
+    ) -> dict[str, Any]:
+        """
+        Mark a call outcome as synced to HubSpot.
+
+        Args:
+            outcome_id: UUID of the call outcome
+            hubspot_engagement_id: HubSpot engagement ID from API response
+
+        Returns:
+            Updated record
+        """
+        from datetime import datetime, timezone
+
+        result = (
+            self.client.table("call_outcomes")
+            .update({
+                "synced_to_hubspot": True,
+                "synced_at": datetime.now(timezone.utc).isoformat(),
+                "hubspot_engagement_id": hubspot_engagement_id,
+            })
+            .eq("id", outcome_id)
+            .execute()
+        )
+        return result.data[0] if result.data else {}
+
+    def update_lead(self, lead_id: str, data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Generic lead field update.
+
+        Used by call outcome service to update last_contacted,
+        contact_count, and lead_status after a call.
+
+        Args:
+            lead_id: Lead UUID
+            data: Fields to update
+
+        Returns:
+            Updated lead record
+        """
+        result = (
+            self.client.table("leads")
+            .update(data)
+            .eq("id", lead_id)
+            .execute()
+        )
+        return result.data[0] if result.data else {}
+
 
 @lru_cache
 def get_supabase_client() -> SupabaseClient:

@@ -57,12 +57,14 @@ backend/
 │   ├── api/routes/
 │   │   ├── agents.py        # LangGraph agent endpoints
 │   │   ├── batch.py         # Batch processing endpoint
+│   │   ├── call_outcomes.py  # BDR call outcome tracking
 │   │   ├── monitoring.py    # Observability (credits, rate-limits, batches)
 │   │   ├── scripts.py       # Script endpoints
 │   │   ├── leads.py         # Lead scoring endpoints
 │   │   └── webhooks.py      # Apollo & Harvester webhooks
 │   ├── data/
 │   │   ├── schemas.py       # Pydantic models
+│   │   ├── call_outcome_schemas.py  # Call outcome Pydantic models
 │   │   ├── scripts.py       # Script lookup functions
 │   │   ├── competitors.py   # Competitor battlecards
 │   │   └── persona_warm_scripts.py  # Persona-specific scripts
@@ -72,6 +74,7 @@ backend/
 │       │   ├── audit.py     # Enrichment audit logging & HubSpot mapping
 │       │   ├── pipeline.py  # Background processing pipeline
 │       │   └── scraper.py   # Web scraping
+│       ├── call_outcomes/    # BDR call outcome tracking service
 │       ├── scoring/         # Lead scoring services
 │       │   └── atl_detector.py  # ATL decision-maker detection (8 personas)
 │       ├── langgraph/       # AI Agents
@@ -153,6 +156,15 @@ Five AI agents + Call Brief Assembler powered by LangGraph + Claude/Cerebras:
 - `POST /api/agents/qualify/stream` - Qualify with streaming progress (SSE)
 - `POST /api/agents/emails/stream` - Token-level email streaming (SSE)
 - `POST /api/agents/call-brief` - **One-page call prep brief** (research + qualify + script in parallel)
+
+### Call Outcome Tracking
+- `POST /api/call-outcomes` - Log a call outcome (auto-updates lead, schedules follow-up)
+- `POST /api/call-outcomes/batch` - Batch log (end-of-day catch-up)
+- `GET /api/call-outcomes/stats` - Daily performance dashboard (?date=YYYY-MM-DD)
+- `GET /api/call-outcomes/stats/range` - Date range stats (?start=&end=)
+- `GET /api/call-outcomes/follow-ups` - Pending follow-ups (?date=&include_overdue=true)
+- `GET /api/call-outcomes/lead/{lead_id}` - Full call history for a lead
+- `POST /api/call-outcomes/{outcome_id}/hubspot-sync` - Manual HubSpot sync
 
 ### Lead Management
 - `POST /api/batch/process` - Process multiple leads
@@ -245,7 +257,35 @@ API Request → Immediate: employer phone only
 
 ---
 
-## Recent Work (2026-02-05) - Call Prep Brief + Ready-to-Dial
+## Recent Work (2026-02-05) - Call Outcome Tracking
+**Branch**: `main`
+
+Closes the feedback loop: log call outcomes, auto-update lead state, auto-schedule follow-ups, track daily stats.
+
+### New Files
+- `migrations/004_add_call_outcomes.sql` - New `call_outcomes` table (UUID PK, disposition, result, follow-up scheduling, HubSpot sync tracking)
+- `app/data/call_outcome_schemas.py` - Pydantic models: CallDisposition, CallResult, FollowUpType enums + request/response models
+- `app/services/call_outcomes/service.py` - CallOutcomeService: log_outcome (with default follow-up rules), get_daily_stats, get_lead_history, get_pending_follow_ups, sync_to_hubspot
+- `app/api/routes/call_outcomes.py` - 7 endpoints under `/api/call-outcomes`
+- `tests/unit/test_call_outcomes.py` (30 tests) - API endpoint tests
+- `tests/unit/test_call_outcome_service.py` (17 tests) - Service/business logic tests
+
+### Modified Files
+- `app/services/database/supabase_client.py` - Added 8 CRUD methods for call outcomes
+- `app/main.py` - Registered call_outcomes_router
+
+### Key Features
+- **Default Follow-Up Rules**: VM→callback 2 days, no_answer→1 day, gatekeeper→1 day, connected+FU→email 3 days. Tim can override.
+- **Lead Status Auto-Update**: meeting_booked→meeting_scheduled, qualified_out→disqualified, dead→dead. Others unchanged.
+- **Business Day Calc**: Follow-up dates skip weekends
+- **Daily Stats**: connect_rate, meeting_rate (meetings/connections), avg_duration (connected only), phone_type breakdown
+- **No AI/LLM**: Pure data tracking, no external API calls except optional HubSpot sync
+
+**Code Quality**: 1064 tests passed, 5 skipped, 0 mypy errors, 0 ruff errors (47 new tests)
+
+---
+
+## Previous Work (2026-02-05) - Call Prep Brief + Ready-to-Dial
 **Branch**: `main`
 
 Implemented single-endpoint call preparation replacing 3 separate API calls + manual combination.

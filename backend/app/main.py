@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.agents import router as agents_router
 from app.api.routes.batch import router as batch_router
 from app.api.routes.call_brief import router as call_brief_router
+from app.api.routes.call_outcomes import router as call_outcomes_router
 from app.api.routes.competitors import router as competitors_router
 from app.api.routes.leads import router as leads_router
 from app.api.routes.monitoring import router as monitoring_router
@@ -77,4 +78,5 @@ app.include_router(agents_router)  # Already has /api/agents prefix
 app.include_router(call_brief_router)  # Already has /api/agents prefix - Call prep briefs
 app.include_router(batch_router)  # Already has /api/batch prefix
 app.include_router(webhooks_router)  # Already has /api/webhooks prefix - PHONES ARE GOLD!
+app.include_router(call_outcomes_router)  # Already has /api/call-outcomes prefix - Close the feedback loop
 app.include_router(monitoring_router)  # Already has /api/monitoring prefix - Track the gold spend!
