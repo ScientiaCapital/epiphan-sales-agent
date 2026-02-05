@@ -86,7 +86,7 @@ backend/
 │       └── integrations/
 │           └── hubspot/     # HubSpot CRM client
 ├── tests/
-│   ├── unit/                # Unit tests (891+)
+│   ├── unit/                # Unit tests (1017+)
 │   └── integration/         # Integration tests
 └── pyproject.toml
 ```
@@ -108,13 +108,14 @@ backend/
 - trial_signup
 
 ## LangGraph Agents
-Five AI agents powered by LangGraph + Claude/Cerebras:
+Five AI agents + Call Brief Assembler powered by LangGraph + Claude/Cerebras:
 
 1. **Lead Research Agent** - Enriches leads via Apollo, web scraping
 2. **Script Selection Agent** - Selects and personalizes call scripts
 3. **Competitor Intelligence Agent** - Provides battlecard responses
 4. **Email Personalization Agent** - Generates personalized outreach emails
 5. **Qualification Agent** - Scores leads against 5-dimension weighted ICP criteria
+6. **Call Brief Assembler** - Composes research + qualify + script agents in parallel into one-page call prep brief
 
 ### ICP Qualification Scoring
 | Dimension | Weight | Scoring |
@@ -151,6 +152,7 @@ Five AI agents powered by LangGraph + Claude/Cerebras:
 - `POST /api/agents/qualify` - Qualify lead against ICP criteria
 - `POST /api/agents/qualify/stream` - Qualify with streaming progress (SSE)
 - `POST /api/agents/emails/stream` - Token-level email streaming (SSE)
+- `POST /api/agents/call-brief` - **One-page call prep brief** (research + qualify + script in parallel)
 
 ### Lead Management
 - `POST /api/batch/process` - Process multiple leads
@@ -158,6 +160,7 @@ Five AI agents powered by LangGraph + Claude/Cerebras:
 - `POST /api/leads/ingest` - Ingest leads from Lead Harvester (with phone enrichment)
 - `POST /api/leads/sync` - HubSpot sync
 - `GET /api/leads/prioritized` - Get leads by tier/persona
+- `GET /api/leads/ready-to-dial` - **Ready-to-dial list** (leads ranked by score with phones)
 
 ## Known Issues
 - ~~mypy errors~~ **RESOLVED** (2026-01-31): All 174 errors fixed, strict mode compliant
@@ -242,7 +245,35 @@ API Request → Immediate: employer phone only
 
 ---
 
-## Recent Work (2026-02-05 Morning) - Integration Testing Sprint
+## Recent Work (2026-02-05) - Call Prep Brief + Ready-to-Dial
+**Branch**: `main`
+
+Implemented single-endpoint call preparation replacing 3 separate API calls + manual combination.
+
+### New Files
+- `app/services/langgraph/agents/call_brief.py` - CallBriefAssembler composition layer (runs research + qualify + script agents in parallel via asyncio.gather)
+- `app/api/routes/call_brief.py` - `POST /api/agents/call-brief` endpoint
+- `tests/unit/test_call_brief_assembler.py` (30 tests) - Assembler logic, phone extraction, graceful degradation
+- `tests/unit/test_api_call_brief.py` (11 tests) - API endpoint behavior
+- `tests/unit/test_ready_to_dial.py` (8 tests) - Ready-to-dial filtering
+
+### Modified Files
+- `app/api/routes/leads.py` - Added `GET /api/leads/ready-to-dial` endpoint
+- `app/main.py` - Registered call_brief_router
+- `app/services/langgraph/agents/__init__.py` - Export CallBriefAssembler
+
+### Key Features
+- **Call Brief**: Runs 3 agents in parallel (~3-5s), enriches with playbook data (persona objections, SPIN discovery questions, competitor battlecards, reference stories)
+- **Ready-to-Dial**: Answers "who should I call next?" with leads ranked by score, filterable by tier and phone availability
+- **Graceful Degradation**: Each agent failure returns partial brief from remaining data + static playbook
+- **Quality Scoring**: Rates brief completeness as HIGH/MEDIUM/LOW (phone presence weighted highest at +3)
+- **Intelligence Gaps**: Flags missing phone as CRITICAL
+
+**Code Quality**: 1017 tests passed, 5 skipped, 0 mypy errors, 0 ruff errors (48 new tests)
+
+---
+
+## Previous Work (2026-02-05 Morning) - Integration Testing Sprint
 **Branch**: `main`
 
 Completed integration testing for the gap analysis features implemented in the previous session:

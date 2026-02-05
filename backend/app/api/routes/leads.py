@@ -772,6 +772,145 @@ async def get_prioritized_leads(
     )
 
 
+# =============================================================================
+# Ready-to-Dial Models
+# =============================================================================
+
+
+class ReadyToDialEntry(BaseModel):
+    """Single entry in the ready-to-dial list.
+
+    Each entry has everything Tim needs to decide whether to dial:
+    name, company, title, persona, tier, score, and best phone.
+    """
+
+    lead_id: str | None = None
+    hubspot_id: str
+    name: str | None = None
+    company: str | None = None
+    title: str | None = None
+    email: str | None = None
+    persona_match: str | None = None
+    tier: str = "cold"
+    total_score: int = 0
+    best_phone: str | None = None
+    has_phone: bool = False
+    last_contacted: datetime | None = None
+    call_brief_url: str = Field(default="", description="POST to this URL with lead data for full brief")
+
+
+class ReadyToDialResponse(BaseModel):
+    """Response for ready-to-dial endpoint.
+
+    Answers: 'Who should I call next?'
+    Leads are pre-filtered and sorted by score descending.
+    """
+
+    leads: list[ReadyToDialEntry]
+    total_count: int
+    filters_applied: dict[str, Any]
+
+
+@router.get("/ready-to-dial", response_model=ReadyToDialResponse)
+async def get_ready_to_dial(
+    limit: Annotated[int, Query(ge=1, le=100, description="Max leads to return")] = 20,
+    min_tier: Annotated[
+        str | None,
+        Query(description="Minimum tier: 'hot' (85+), 'warm' (70+), 'nurture' (50+). Default: warm"),
+    ] = "warm",
+    require_phone: Annotated[
+        bool,
+        Query(description="Only return leads with a phone number (PHONES ARE GOLD)"),
+    ] = False,
+) -> ReadyToDialResponse:
+    """Get leads ready for Tim to dial, ranked by priority.
+
+    Answers 'Who should I call next?' in < 1 second.
+
+    Returns leads sorted by total_score descending with optional filters:
+    - min_tier: Minimum quality tier (default: warm = 70+ score)
+    - require_phone: Only leads with phone numbers (PHONES ARE GOLD)
+    - limit: How many leads to show (default: 20)
+
+    Each entry includes a call_brief_url for generating the full brief.
+    """
+    # Map tier names to minimum scores for filtering
+    tier_min_scores: dict[str, int] = {
+        "hot": 85,
+        "warm": 70,
+        "nurture": 50,
+        "cold": 0,
+    }
+    min_score = tier_min_scores.get(min_tier or "warm", 70)
+
+    # Map tier to filter value — get all tiers at or above minimum
+    tier_filter: str | None = None
+    if min_tier == "hot":
+        tier_filter = "hot"
+    elif min_tier == "warm":
+        # Need hot + warm — query without tier filter, post-filter by score
+        tier_filter = None
+    elif min_tier == "nurture":
+        tier_filter = None
+    else:
+        tier_filter = None
+
+    # Get leads from Supabase sorted by score
+    leads_data = supabase_client.get_prioritized_leads(
+        tier=tier_filter,
+        limit=limit * 3,  # Over-fetch to allow post-filtering
+        offset=0,
+    )
+
+    # Post-filter by minimum score and phone requirement
+    entries: list[ReadyToDialEntry] = []
+    for lead_data in leads_data:
+        score = lead_data.get("total_score", 0)
+        if score < min_score:
+            continue
+
+        phone = lead_data.get("phone")
+        if require_phone and not phone:
+            continue
+
+        # Build name
+        first = lead_data.get("first_name", "")
+        last = lead_data.get("last_name", "")
+        name = f"{first} {last}".strip() if (first or last) else None
+
+        entries.append(
+            ReadyToDialEntry(
+                lead_id=lead_data.get("id"),
+                hubspot_id=lead_data.get("hubspot_id", ""),
+                name=name,
+                company=lead_data.get("company"),
+                title=lead_data.get("title"),
+                email=lead_data.get("email"),
+                persona_match=lead_data.get("persona_match"),
+                tier=lead_data.get("tier", "cold"),
+                total_score=score,
+                best_phone=phone,
+                has_phone=phone is not None and phone != "",
+                last_contacted=lead_data.get("last_contacted"),
+                call_brief_url="/api/agents/call-brief",
+            )
+        )
+
+        if len(entries) >= limit:
+            break
+
+    return ReadyToDialResponse(
+        leads=entries,
+        total_count=len(entries),
+        filters_applied={
+            "min_tier": min_tier,
+            "min_score": min_score,
+            "require_phone": require_phone,
+            "limit": limit,
+        },
+    )
+
+
 @router.get("/{lead_id}", response_model=dict[str, Any])
 async def get_lead_by_id(lead_id: str) -> dict[str, Any]:
     """

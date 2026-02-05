@@ -12,12 +12,13 @@
 │                     FastAPI Backend                              │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │ Routes: agents, batch, leads, monitoring, scripts,       │  │
-│  │         webhooks, personas, competitors                   │  │
+│  │         webhooks, personas, competitors, call-brief      │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │  ┌───────────────┐  ┌───────────────┐  ┌────────────────────┐  │
 │  │  LangGraph    │  │  Enrichment   │  │   Integrations     │  │
-│  │  5 Agents     │  │  Apollo       │  │   HubSpot/Clari    │  │
-│  │               │  │               │  │                    │  │
+│  │  5 Agents +   │  │  Apollo       │  │   HubSpot/Clari    │  │
+│  │  Call Brief   │  │               │  │                    │  │
+│  │  Assembler    │  │               │  │                    │  │
 │  └───────────────┘  └───────────────┘  └────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -38,12 +39,14 @@
 - `POST /api/agents/emails/with-approval` - Email with HITL
 - `POST /api/agents/qualify` - Lead qualification
 - `POST /api/agents/qualify/stream` - Streaming qualification
+- `POST /api/agents/call-brief` - One-page call prep brief (composes research + qualify + script)
 
 ### Lead Management
 - `POST /api/leads/ingest` - Harvester batch ingest
 - `POST /api/leads/sync` - HubSpot sync
 - `POST /api/leads/score` - Score unscored leads
 - `GET /api/leads/prioritized` - Get by tier/persona
+- `GET /api/leads/ready-to-dial` - Daily call list with tier/phone filtering
 - `GET /api/leads/{id}` - Single lead
 
 ### Monitoring & Webhooks
@@ -77,3 +80,11 @@
 - Harvester leads processed asynchronously
 - In-memory batch tracking (MVP)
 - Integration with monitoring endpoints
+
+### 4. Call Brief Assembler (NOT a LangGraph agent)
+- Composition layer using raw `asyncio.gather()` for parallel agent execution
+- Avoids MasterOrchestrator overhead (no review gates, checkpointing, HubSpot sync)
+- Graceful degradation: each agent wrapped in `_safe_*()` try/except returning None
+- Enriches with playbook data: objections, discovery questions, competitor battlecards, reference stories
+- Phone extraction from 3 sources: research result, lead record, webhook table
+- Brief quality scoring: HIGH (8+), MEDIUM (4-7), LOW (<4) based on data completeness

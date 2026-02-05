@@ -1,5 +1,6 @@
 """LangGraph agents for Epiphan Sales Intelligence."""
 
+from app.services.langgraph.agents.call_brief import CallBriefAssembler
 from app.services.langgraph.agents.competitor_intel import CompetitorIntelAgent
 from app.services.langgraph.agents.email_personalization import (
     EmailPersonalizationAgent,
@@ -9,6 +10,7 @@ from app.services.langgraph.agents.qualification import QualificationAgent
 from app.services.langgraph.agents.script_selection import ScriptSelectionAgent
 
 __all__ = [
+    "CallBriefAssembler",
     "CompetitorIntelAgent",
     "ScriptSelectionAgent",
     "LeadResearchAgent",

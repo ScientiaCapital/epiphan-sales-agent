@@ -1,42 +1,57 @@
 # Current Task Status
 
-## Session: 2026-02-05 (Morning)
+## Session: 2026-02-05 (Evening)
 
 ### Completed This Session
-1. **Integration Testing Sprint** ✅
-   - [x] Test extended thinking on real edge cases (borderline scores 28-32, 48-52, 68-72)
-   - [x] Verify AES encryption with LANGGRAPH_AES_KEY env var
-   - [x] Middleware pipeline integration tests
+1. **Call Prep Brief + Ready-to-Dial Sprint** ✅
+   - [x] CallBriefAssembler composition layer (asyncio.gather, 3 agents in parallel)
+   - [x] 15 Pydantic response models (PhoneInfo, ContactInfo, CompanySnapshot, etc.)
+   - [x] `POST /api/agents/call-brief` endpoint with @trace_agent
+   - [x] `GET /api/leads/ready-to-dial` endpoint with tier/phone filtering
+   - [x] Playbook enrichment (objections, discovery, competitors, reference stories)
+   - [x] Brief quality scoring (HIGH/MEDIUM/LOW) + intelligence gap detection
+   - [x] Graceful degradation (partial briefs when agents fail)
+   - [x] 48 new tests (30 assembler + 11 API + 8 ready-to-dial)
 
-**New Test Files Created:**
-- `tests/unit/test_checkpointing_encryption.py` (20 tests)
-- `tests/integration/test_qualification_edge_cases.py` (21 tests)
-- `tests/integration/test_middleware_pipeline.py` (24 tests)
+2. **Integration Testing Sprint** ✅ (earlier today)
+   - [x] AES encryption roundtrip tests (20 tests)
+   - [x] Extended thinking edge case tests (21 tests)
+   - [x] Middleware pipeline integration tests (24 tests)
 
 ### Code Quality Status
 | Check | Status |
 |-------|--------|
-| Tests | 969 passed, 5 skipped |
+| Tests | 1012 passed, 5 skipped |
 | mypy | 0 errors |
 | Ruff lint | 0 errors |
 | Secrets | 0 found |
 
 ### Current Test Counts
-- Total: 974 tests (969 passed, 5 skipped)
+- Total: 1017 tests (1012 passed, 5 skipped)
 
 ---
 
 ## Backlog (Future Sessions)
 
-1. **Frontend Development** (Medium)
+1. **Call Outcome Tracking** (High — next sprint)
+   - [ ] New DB schema for call outcomes (connected, voicemail, no answer, etc.)
+   - [ ] POST /api/calls/outcome endpoint
+   - [ ] Cadence management (depends on outcome tracking)
+
+2. **API Authentication** (High)
+   - [ ] Add API key or JWT auth to all endpoints
+   - [ ] Rate limiting per client
+
+3. **Frontend Development** (Medium)
    - [ ] Build monitoring dashboard UI
    - [ ] Phone approval interface
+   - [ ] Call brief viewer
 
-2. **Memory Integration** (Low)
+4. **Memory Integration** (Low)
    - [ ] Wire UserMemoryStore into orchestrator
    - [ ] Wire ConversationSummarizer for long sessions
 
-3. **Full E2E Testing**
+5. **Full E2E Testing**
    - [ ] Test Harvester → Pipeline → Qualification flow
 
 ---
