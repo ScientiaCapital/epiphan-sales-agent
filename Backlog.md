@@ -21,7 +21,25 @@
 
 ---
 
-## Completed ✓
+## Completed
+
+### LangGraph v1.0 Best Practices (DONE - 2026-02-05)
+- [x] Anthropic prompt caching header (~10x speedup)
+- [x] InMemoryCache for Apollo enrichment
+- [x] RetryPolicy with exponential backoff
+- [x] Command pattern for routing
+- [x] Input/Output schemas for cleaner API
+- [x] Extended thinking client
+- [x] Time-travel debug endpoint
+
+### LangGraph Agent Polish Sprint (DONE - 2026-02-05)
+- [x] Master Orchestrator with parallel execution
+- [x] Review gates for quality control
+- [x] MessageTrimmer for memory management
+- [x] SemanticMemory for pattern learning
+- [x] Middleware layer (PII, rate limit, model selection)
+- [x] LangSmith observability/tracing
+- [x] Token-level streaming endpoints
 
 ### Code Quality (DONE)
 - [x] Run `ruff check . --fix` - 0 lint errors
@@ -46,7 +64,7 @@
 - [x] Background processing pipeline
 
 ### Testing (DONE)
-- [x] 674 unit tests passing
+- [x] 890 unit tests passing
 - [x] Comprehensive test coverage for all new features
 
 ### Tech Debt Resolution (DONE)

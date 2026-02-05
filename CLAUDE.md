@@ -242,7 +242,29 @@ API Request → Immediate: employer phone only
 
 ---
 
-## Recent Work (2026-02-05) - LangGraph Agent Polish Sprint
+## Recent Work (2026-02-05 Evening) - LangGraph v1.0 Best Practices
+**Branch**: `feature/agent-polish` → merged to `main`
+
+Implemented recommendations from LangGraph documentation research (27 URLs analyzed):
+
+### Phase 1: Quick Wins
+- **Prompt Caching**: Added `anthropic-beta: prompt-caching-2024-07-31` header for ~10x speedup
+- **Node Caching**: `InMemoryCache` for Apollo enrichment (avoids 8 credit duplicate calls)
+- **RetryPolicy**: Native LangGraph retry with exponential backoff for API calls
+
+### Phase 2: Architecture Improvements
+- **Command Pattern**: Review gates now use `Command(update=..., goto=...)` for explicit routing
+- **Input/Output Schemas**: `OrchestratorInput` and `OrchestratorOutput` TypedDicts for cleaner API
+
+### Phase 3: Optional Enhancements
+- **Extended Thinking**: `claude_with_thinking` property with 2000 token thinking budget
+- **Time-Travel Debug**: `GET /api/agents/debug/{thread_id}/history` for checkpoint history
+
+**Code Quality**: 890 tests passed, 5 skipped, 0 mypy errors, 0 ruff errors
+
+---
+
+## Previous Work (2026-02-05) - LangGraph Agent Polish Sprint
 **Branch**: `feature/agent-polish` → `feature/agent-orchestration`
 
 Completed 7-phase sprint implementing LangChain best practices:
