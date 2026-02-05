@@ -17,7 +17,6 @@
 - [ ] Webhook retry logic for failures
 
 ## Tech Debt
-- [ ] Fix mypy type stub issues (fastapi, hubspot)
 - [ ] Fix integration test fixture (`_supabase_client`)
 
 ---
@@ -47,8 +46,11 @@
 - [x] Background processing pipeline
 
 ### Testing (DONE)
-- [x] 662 unit tests passing
+- [x] 674 unit tests passing
 - [x] Comprehensive test coverage for all new features
+
+### Tech Debt Resolution (DONE)
+- [x] Fix mypy type stub issues (fastapi, hubspot) - strict mode compliant
 
 ### Cleanup (DONE)
 - [x] Removed Clearbit enrichment (consolidated to Apollo-only)
