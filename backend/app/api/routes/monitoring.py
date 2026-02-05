@@ -324,3 +324,112 @@ async def get_batch_status(batch_id: str) -> BatchStatusResponse:
         direct_phones_found=batch.direct_phones_found,
         any_phones_found=batch.any_phones_found,
     )
+
+
+# =============================================================================
+# Agent Telemetry Endpoints
+# =============================================================================
+
+
+class TelemetryMetricsResponse(BaseModel):
+    """Response for agent telemetry metrics."""
+
+    agent_executions: dict[str, int] = Field(
+        description="Execution counts by agent"
+    )
+    api_calls: dict[str, int] = Field(
+        description="API call counts by provider"
+    )
+    phase_stats: dict[str, dict[str, Any]] = Field(
+        description="Phase-level statistics"
+    )
+    total_traces: int = Field(description="Total traces in memory")
+
+
+class ExecutionTraceResponse(BaseModel):
+    """Response for execution trace."""
+
+    trace_id: str
+    agent_name: str
+    lead_id: str | None
+    start_time: str
+    end_time: str | None
+    total_duration_ms: float
+    status: str
+    phases: list[dict[str, Any]]
+    metadata: dict[str, Any]
+
+
+class TracesListResponse(BaseModel):
+    """Response for list of traces."""
+
+    traces: list[ExecutionTraceResponse]
+    total: int
+
+
+@router.get("/telemetry", response_model=TelemetryMetricsResponse)
+async def get_telemetry_metrics() -> TelemetryMetricsResponse:
+    """
+    Get aggregated agent telemetry metrics.
+
+    Provides visibility into:
+    - Agent execution counts
+    - API call volumes by provider
+    - Phase-level timing statistics and error rates
+
+    Returns:
+        Aggregated metrics across all agent executions
+    """
+    from app.services.langgraph.telemetry import agent_telemetry
+
+    metrics = agent_telemetry.get_metrics()
+
+    return TelemetryMetricsResponse(
+        agent_executions=metrics["agent_executions"],
+        api_calls=metrics["api_calls"],
+        phase_stats=metrics["phase_stats"],
+        total_traces=metrics["total_traces"],
+    )
+
+
+@router.get("/telemetry/traces", response_model=TracesListResponse)
+async def get_telemetry_traces(
+    agent_name: str | None = None,
+    limit: int = 10,
+) -> TracesListResponse:
+    """
+    Get recent execution traces.
+
+    Traces provide detailed phase-by-phase breakdown of agent executions.
+
+    Args:
+        agent_name: Optional filter by agent name
+        limit: Maximum traces to return (default 10, max 100)
+
+    Returns:
+        List of recent traces with phase details
+    """
+    from app.services.langgraph.telemetry import agent_telemetry
+
+    limit = min(limit, 100)
+    traces = agent_telemetry.get_recent_traces(agent_name=agent_name, limit=limit)
+
+    return TracesListResponse(
+        traces=[ExecutionTraceResponse(**t) for t in traces],
+        total=len(traces),
+    )
+
+
+@router.get("/telemetry/errors")
+async def get_telemetry_errors() -> dict[str, Any]:
+    """
+    Get summary of errors across all agent phases.
+
+    Use this to identify problematic phases and error patterns.
+
+    Returns:
+        Error counts and rates by agent:phase
+    """
+    from app.services.langgraph.telemetry import agent_telemetry
+
+    return agent_telemetry.get_error_summary()

@@ -8,6 +8,7 @@ import asyncio
 from typing import Any
 
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.data.lead_schemas import Lead
@@ -178,4 +179,136 @@ async def batch_process_leads(request: BatchRequest) -> BatchResponse:
             successful=successful,
             failed=failed,
         ),
+    )
+
+
+class StreamingBatchRequest(BaseModel):
+    """Request for streaming batch processing with orchestrator."""
+
+    leads: list[Lead]
+    concurrency: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Max concurrent lead processing",
+    )
+    skip_outreach: bool = Field(
+        default=False,
+        description="Skip outreach phase (research/qualify only)",
+    )
+
+
+class StreamEvent(BaseModel):
+    """SSE event for streaming batch progress."""
+
+    event_type: str  # "progress" | "result" | "error" | "complete"
+    lead_id: str | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/process/stream")
+async def batch_process_stream(request: StreamingBatchRequest) -> StreamingResponse:
+    """
+    Process leads in parallel with real-time SSE progress streaming.
+
+    Uses the Master Orchestrator Agent for full pipeline processing.
+    Streams results as they complete for immediate feedback.
+
+    Events:
+    - progress: Lead processing started
+    - result: Lead processing completed with full result
+    - error: Lead processing failed
+    - complete: All leads processed with summary
+
+    Example usage:
+        curl -N -X POST http://localhost:8001/api/batch/process/stream \\
+            -H "Content-Type: application/json" \\
+            -d '{"leads": [{"hubspot_id": "123", "email": "test@example.com"}]}'
+    """
+    from collections.abc import AsyncGenerator
+    from json import dumps
+
+    from fastapi.responses import StreamingResponse
+
+    from app.services.langgraph.agents.orchestrator import MasterOrchestratorAgent
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        semaphore = asyncio.Semaphore(request.concurrency)
+        orchestrator = MasterOrchestratorAgent()
+        completed = 0
+        failed = 0
+        total = len(request.leads)
+
+        async def process_lead(lead: Lead) -> tuple[str, dict[str, Any] | None, str | None]:
+            """Process a single lead and return (hubspot_id, result, error)."""
+            async with semaphore:
+                try:
+                    result = await orchestrator.run(
+                        lead=lead,
+                        process_config={"skip_outreach": request.skip_outreach},
+                    )
+                    return (lead.hubspot_id, result, None)
+                except Exception as e:
+                    return (lead.hubspot_id, None, str(e))
+
+        # Create all tasks
+        tasks = [process_lead(lead) for lead in request.leads]
+
+        # Stream progress events for all leads starting
+        for lead in request.leads:
+            progress_event = StreamEvent(
+                event_type="progress",
+                lead_id=lead.hubspot_id,
+                data={"status": "queued", "email": lead.email},
+            )
+            yield f"data: {dumps(progress_event.model_dump())}\n\n"
+
+        # Process and stream results as they complete
+        for coro in asyncio.as_completed(tasks):
+            hubspot_id, result, error = await coro
+
+            if error:
+                failed += 1
+                error_event = StreamEvent(
+                    event_type="error",
+                    lead_id=hubspot_id,
+                    data={"error": error},
+                )
+                yield f"data: {dumps(error_event.model_dump())}\n\n"
+            else:
+                completed += 1
+                result_event = StreamEvent(
+                    event_type="result",
+                    lead_id=hubspot_id,
+                    data={
+                        "tier": result.get("tier") if result else None,
+                        "is_atl": result.get("is_atl") if result else None,
+                        "has_phone": result.get("has_phone") if result else None,
+                        "has_script": bool(result.get("script_result")) if result else False,
+                        "has_email": bool(result.get("email_result")) if result else False,
+                        "duration_ms": result.get("total_duration_ms") if result else None,
+                        "errors": result.get("errors", []) if result else [],
+                    },
+                )
+                yield f"data: {dumps(result_event.model_dump())}\n\n"
+
+        # Send completion event
+        complete_event = StreamEvent(
+            event_type="complete",
+            data={
+                "total": total,
+                "completed": completed,
+                "failed": failed,
+                "success_rate": (completed / total * 100) if total > 0 else 0,
+            },
+        )
+        yield f"data: {dumps(complete_event.model_dump())}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
     )

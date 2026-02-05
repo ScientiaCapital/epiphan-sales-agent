@@ -189,3 +189,83 @@ class QualificationState(TypedDict):
     # Action recommendation
     next_action: NextAction | None
     missing_info: list[str]  # Information gaps identified
+
+
+# =============================================================================
+# Master Orchestrator State
+# =============================================================================
+
+
+class GateDecision(TypedDict):
+    """Decision from a review gate checkpoint."""
+
+    proceed: bool  # Whether to proceed to next phase
+    gate_name: str  # Name of the gate that made the decision
+    passed_checks: list[str]  # Checks that passed
+    failed_checks: list[str]  # Checks that failed
+    remediation: str | None  # Suggested remediation if failed
+    next_phase: str | None  # Next phase to proceed to if passed
+
+
+class PhaseResult(TypedDict):
+    """Result from a single orchestrator phase."""
+
+    phase_name: str
+    status: str  # "success" | "partial" | "failed"
+    duration_ms: float
+    errors: list[str]
+    data: dict[str, Any]
+
+
+class OrchestratorState(TypedDict):
+    """State for Master Orchestrator Agent.
+
+    The orchestrator coordinates all sub-agents through phases:
+    1. Parallel Research Phase: research, qualification, enrichment (concurrent)
+    2. Review Gate 1: Validate data completeness
+    3. Parallel Outreach Phase: script, email, competitor intel (concurrent)
+    4. Review Gate 2: Final quality check
+    5. Sync Phase: Push to HubSpot
+
+    Flow:
+        parallel_research → review_gate_1 → parallel_outreach → review_gate_2 → sync
+
+    Architecture based on:
+    - Anthropic's two-agent system pattern
+    - DeepAgents task delegation model
+    - Claude 4 parallel tool execution best practices
+    """
+
+    # === Input ===
+    lead: Lead
+    process_config: dict[str, Any]  # Processing options
+
+    # === Phase 1: Parallel Research Results ===
+    research_brief: ResearchBrief | None
+    qualification_result: dict[str, Any] | None  # ICP scoring result
+    enrichment_data: dict[str, Any] | None  # Apollo + scraped data
+
+    # === Gate 1 Decision ===
+    gate_1_decision: GateDecision | None
+
+    # === Phase 2: Parallel Outreach Results ===
+    script_result: dict[str, Any] | None  # Personalized call script
+    email_result: dict[str, Any] | None  # Generated email
+    competitor_intel: dict[str, Any] | None  # Battlecard responses
+
+    # === Gate 2 Decision ===
+    gate_2_decision: GateDecision | None
+
+    # === Sync Phase Results ===
+    hubspot_sync_result: dict[str, Any] | None
+
+    # === Execution Tracking ===
+    current_phase: str  # "research" | "gate_1" | "outreach" | "gate_2" | "sync" | "complete"
+    phase_results: list[PhaseResult]
+    total_duration_ms: float
+    errors: list[str]
+
+    # === Derived Fields ===
+    tier: QualificationTier | None  # Extracted from qualification_result
+    has_phone: bool  # Whether phone was enriched (CRITICAL for sales)
+    is_atl: bool  # Above-the-line decision maker
