@@ -194,3 +194,114 @@ class TestAgentAPIEndpoints:
             )
 
             assert response.status_code == 200
+
+
+class TestDebugEndpoint:
+    """Tests for the debug/history endpoint."""
+
+    @pytest.fixture
+    def client(self):
+        """Create test client."""
+        from app.main import app
+
+        return TestClient(app)
+
+    def test_debug_history_endpoint_exists(self, client: TestClient):
+        """Test GET /api/agents/debug/{thread_id}/history exists."""
+        # Mock async generator that returns nothing
+        async def mock_alist(_config):
+            return
+            yield  # Make it a generator
+
+        mock_checkpointer = AsyncMock()
+        mock_checkpointer.alist = mock_alist
+
+        with patch(
+            "app.api.routes.agents.get_checkpointer",
+            return_value=mock_checkpointer,
+        ):
+            response = client.get("/api/agents/debug/test-thread-123/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["thread_id"] == "test-thread-123"
+        assert "checkpoints" in data
+        assert "count" in data
+
+    def test_debug_history_returns_checkpoints(self, client: TestClient):
+        """Test debug endpoint returns checkpoint data."""
+        # Create mock checkpoint tuple
+        mock_checkpoint = AsyncMock()
+        mock_checkpoint.config = {
+            "configurable": {
+                "checkpoint_id": "checkpoint-1",
+                "thread_id": "test-thread-123",
+            }
+        }
+        mock_checkpoint.metadata = {"step": 1, "node": "research"}
+
+        # Mock async generator
+        async def mock_alist(_config):
+            yield mock_checkpoint
+
+        mock_checkpointer = AsyncMock()
+        mock_checkpointer.alist = mock_alist
+
+        with patch(
+            "app.api.routes.agents.get_checkpointer",
+            return_value=mock_checkpointer,
+        ):
+            response = client.get("/api/agents/debug/test-thread-123/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["thread_id"] == "test-thread-123"
+        assert data["count"] == 1
+        assert len(data["checkpoints"]) == 1
+        assert data["checkpoints"][0]["checkpoint_id"] == "checkpoint-1"
+        assert data["checkpoints"][0]["metadata"] == {"step": 1, "node": "research"}
+
+    def test_debug_history_handles_nonexistent_thread(self, client: TestClient):
+        """Test debug endpoint handles nonexistent thread gracefully."""
+        # Mock async generator that returns nothing
+        async def mock_alist(_config):
+            return
+            yield  # Make it a generator
+
+        mock_checkpointer = AsyncMock()
+        mock_checkpointer.alist = mock_alist
+
+        with patch(
+            "app.api.routes.agents.get_checkpointer",
+            return_value=mock_checkpointer,
+        ):
+            response = client.get("/api/agents/debug/nonexistent-thread/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["thread_id"] == "nonexistent-thread"
+        assert data["checkpoints"] == []
+        assert data["count"] == 0
+
+    def test_debug_history_handles_errors(self, client: TestClient):
+        """Test debug endpoint handles errors gracefully."""
+        # Mock checkpointer that raises an exception
+        async def mock_alist_error(_config):
+            raise Exception("Database connection failed")
+            yield  # Make it a generator
+
+        mock_checkpointer = AsyncMock()
+        mock_checkpointer.alist = mock_alist_error
+
+        with patch(
+            "app.api.routes.agents.get_checkpointer",
+            return_value=mock_checkpointer,
+        ):
+            response = client.get("/api/agents/debug/test-thread/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["thread_id"] == "test-thread"
+        assert data["checkpoints"] == []
+        assert "error" in data
+        assert "Database connection failed" in data["error"]

@@ -25,6 +25,8 @@ from app.services.langgraph.agents.script_selection import script_selection_agen
 from app.services.langgraph.memory import semantic_memory
 from app.services.langgraph.states import (
     GateDecision,
+    OrchestratorInput,
+    OrchestratorOutput,
     OrchestratorState,
     PhaseResult,
     QualificationTier,
@@ -33,6 +35,7 @@ from app.services.langgraph.states import (
 )
 from app.services.langgraph.tracing import trace_agent, tracing_metrics
 from langgraph.graph import END, StateGraph
+from langgraph.types import Command
 
 
 class MasterOrchestratorAgent:
@@ -66,7 +69,11 @@ class MasterOrchestratorAgent:
 
     def _build_graph(self) -> StateGraph[OrchestratorState]:
         """Build the LangGraph state graph with parallel nodes."""
-        graph: StateGraph[OrchestratorState] = StateGraph(OrchestratorState)
+        graph: StateGraph[OrchestratorState] = StateGraph(
+            OrchestratorState,
+            input_schema=OrchestratorInput,  # type: ignore[arg-type]
+            output_schema=OrchestratorOutput,  # type: ignore[arg-type]
+        )
 
         # === Phase 1: Parallel Research ===
         graph.add_node("parallel_research", self._parallel_research_node)
@@ -94,29 +101,15 @@ class MasterOrchestratorAgent:
         graph.add_edge("parallel_research", "synthesis")
         graph.add_edge("synthesis", "review_gate_1")
 
-        # Conditional routing based on tier after gate 1
-        graph.add_conditional_edges(
-            "review_gate_1",
-            self._route_by_tier,
-            {
-                "tier_1": "parallel_outreach",
-                "tier_2": "parallel_outreach",
-                "tier_3": "parallel_outreach",  # Light touch but still process
-                "not_icp": "archive",
-            },
-        )
+        # Gate 1 routing is handled by Command pattern in _review_gate_1_node
+        # The node returns Command(goto="parallel_outreach" | "archive")
+        # No conditional edges needed - routing is explicit in the Command
 
         graph.add_edge("parallel_outreach", "review_gate_2")
 
-        # Conditional routing after gate 2
-        graph.add_conditional_edges(
-            "review_gate_2",
-            self._route_after_gate_2,
-            {
-                "proceed": "sync_to_hubspot",
-                "skip_sync": END,
-            },
-        )
+        # Gate 2 routing is handled by Command pattern in _review_gate_2_node
+        # The node returns Command(goto="sync_to_hubspot" | "__end__")
+        # No conditional edges needed - routing is explicit in the Command
 
         graph.add_edge("sync_to_hubspot", END)
         graph.add_edge("archive", END)
@@ -437,7 +430,7 @@ class MasterOrchestratorAgent:
 
     async def _review_gate_1_node(
         self, state: OrchestratorState
-    ) -> dict[str, Any]:
+    ) -> Command[Literal["parallel_outreach", "archive"]]:
         """
         Review Gate 1: Validate data completeness before outreach.
 
@@ -445,6 +438,10 @@ class MasterOrchestratorAgent:
         - Has qualification result
         - Has research brief OR enrichment data
         - Phone number available (CRITICAL for sales)
+
+        Returns a Command with explicit routing via goto:
+        - "parallel_outreach" for Tier 1/2/3 leads
+        - "archive" for not ICP or failed gate
         """
         passed_checks: list[str] = []
         failed_checks: list[str] = []
@@ -488,10 +485,19 @@ class MasterOrchestratorAgent:
             "next_phase": next_phase,
         }
 
-        return {
-            "gate_1_decision": gate_decision,
-            "current_phase": "outreach" if gate_passes and tier != QualificationTier.NOT_ICP else "archive",
-        }
+        # Determine routing: proceed to outreach only for qualified leads (Tier 1/2/3)
+        should_proceed_to_outreach = (
+            gate_passes and tier != QualificationTier.NOT_ICP
+        )
+        current_phase = "outreach" if should_proceed_to_outreach else "archive"
+
+        return Command(
+            update={
+                "gate_1_decision": gate_decision,
+                "current_phase": current_phase,
+            },
+            goto="parallel_outreach" if should_proceed_to_outreach else "archive",
+        )
 
     async def _parallel_outreach_node(
         self, state: OrchestratorState
@@ -564,13 +570,17 @@ class MasterOrchestratorAgent:
 
     async def _review_gate_2_node(
         self, state: OrchestratorState
-    ) -> dict[str, Any]:
+    ) -> Command[Literal["sync_to_hubspot", "__end__"]]:
         """
         Review Gate 2: Final quality check before sync.
 
         Checks:
         - At least one outreach asset generated
         - Script or email available for sales use
+
+        Returns a Command with explicit routing via goto:
+        - "sync_to_hubspot" if gate passes
+        - "__end__" (END) if gate fails
         """
         passed_checks: list[str] = []
         failed_checks: list[str] = []
@@ -599,10 +609,15 @@ class MasterOrchestratorAgent:
             "next_phase": "sync" if gate_passes else None,
         }
 
-        return {
-            "gate_2_decision": gate_decision,
-            "current_phase": "sync" if gate_passes else "complete",
-        }
+        current_phase = "sync" if gate_passes else "complete"
+
+        return Command(
+            update={
+                "gate_2_decision": gate_decision,
+                "current_phase": current_phase,
+            },
+            goto="sync_to_hubspot" if gate_passes else "__end__",
+        )
 
     async def _sync_node(self, state: OrchestratorState) -> dict[str, Any]:
         """
@@ -901,8 +916,15 @@ class MasterOrchestratorAgent:
             "is_atl": False,
         }
 
-        # Run the graph
-        result = await compiled.ainvoke(cast(Any, initial_state))
+        # Run the graph using astream with 'values' mode to get accumulated state
+        # This is required when using Command pattern for routing, as ainvoke
+        # may not return the full accumulated state with Command-based nodes
+        result: dict[str, Any] = {}
+        async for state_update in compiled.astream(
+            cast(Any, initial_state),
+            stream_mode="values",
+        ):
+            result = state_update
 
         # Calculate total duration
         total_duration_ms = (time.time() - start_time) * 1000

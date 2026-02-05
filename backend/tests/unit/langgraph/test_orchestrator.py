@@ -6,6 +6,7 @@ Tests the multi-agent coordination, parallel execution, and review gates.
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from langgraph.types import Command
 
 from app.data.lead_schemas import Lead
 from app.services.langgraph.agents.orchestrator import (
@@ -210,11 +211,16 @@ class TestReviewGate1:
         }
 
         result = await agent._review_gate_1_node(state)
-        decision = result["gate_1_decision"]
+
+        # Result is now a Command object with explicit routing
+        assert isinstance(result, Command)
+        decision = result.update["gate_1_decision"]
 
         assert decision["proceed"] is True
         assert "qualification_completed" in decision["passed_checks"]
         assert "research_data_available" in decision["passed_checks"]
+        # Verify Command routing goes to outreach for Tier 1
+        assert result.goto == "parallel_outreach"
 
     @pytest.mark.asyncio
     async def test_gate_1_fails_without_qualification(
@@ -233,10 +239,15 @@ class TestReviewGate1:
         }
 
         result = await agent._review_gate_1_node(state)
-        decision = result["gate_1_decision"]
+
+        # Result is now a Command object with explicit routing
+        assert isinstance(result, Command)
+        decision = result.update["gate_1_decision"]
 
         assert decision["proceed"] is False
         assert "qualification_missing" in decision["failed_checks"]
+        # Failed gate routes to archive
+        assert result.goto == "archive"
 
     @pytest.mark.asyncio
     async def test_gate_1_routes_not_icp_to_archive(
@@ -255,10 +266,15 @@ class TestReviewGate1:
         }
 
         result = await agent._review_gate_1_node(state)
-        decision = result["gate_1_decision"]
+
+        # Result is now a Command object with explicit routing
+        assert isinstance(result, Command)
+        decision = result.update["gate_1_decision"]
 
         assert decision["proceed"] is True
         assert decision["next_phase"] == "archive"
+        # Command explicitly routes to archive for not ICP
+        assert result.goto == "archive"
 
 
 class TestTierRouting:
@@ -422,10 +438,15 @@ class TestReviewGate2:
         }
 
         result = await agent._review_gate_2_node(state)
-        decision = result["gate_2_decision"]
+
+        # Result is now a Command object with explicit routing
+        assert isinstance(result, Command)
+        decision = result.update["gate_2_decision"]
 
         assert decision["proceed"] is True
         assert "script_generated" in decision["passed_checks"]
+        # Command routes to sync when gate passes
+        assert result.goto == "sync_to_hubspot"
 
     @pytest.mark.asyncio
     async def test_gate_2_passes_with_email(
@@ -441,10 +462,15 @@ class TestReviewGate2:
         }
 
         result = await agent._review_gate_2_node(state)
-        decision = result["gate_2_decision"]
+
+        # Result is now a Command object with explicit routing
+        assert isinstance(result, Command)
+        decision = result.update["gate_2_decision"]
 
         assert decision["proceed"] is True
         assert "email_generated" in decision["passed_checks"]
+        # Command routes to sync when gate passes
+        assert result.goto == "sync_to_hubspot"
 
     @pytest.mark.asyncio
     async def test_gate_2_fails_without_content(
@@ -460,11 +486,16 @@ class TestReviewGate2:
         }
 
         result = await agent._review_gate_2_node(state)
-        decision = result["gate_2_decision"]
+
+        # Result is now a Command object with explicit routing
+        assert isinstance(result, Command)
+        decision = result.update["gate_2_decision"]
 
         assert decision["proceed"] is False
         assert "script_missing" in decision["failed_checks"]
         assert "email_missing" in decision["failed_checks"]
+        # Command routes to END when gate fails
+        assert result.goto == "__end__"
 
 
 class TestHelperMethods:

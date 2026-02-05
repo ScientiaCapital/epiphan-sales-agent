@@ -289,3 +289,52 @@ class OrchestratorState(TypedDict):
     tier: QualificationTier | None  # Extracted from qualification_result
     has_phone: bool  # Whether phone was enriched (CRITICAL for sales)
     is_atl: bool  # Above-the-line decision maker
+
+
+class OrchestratorInput(TypedDict):
+    """Input schema for Master Orchestrator Agent.
+
+    This defines the minimal required inputs to start orchestration.
+    Callers only need to provide these fields - all intermediate
+    and output fields will be populated during execution.
+
+    Fields:
+        lead: The lead to process through the orchestration pipeline.
+        process_config: Processing options that control which phases run.
+            Common options:
+            - skip_enrichment: bool - Skip Apollo enrichment
+            - skip_hubspot_sync: bool - Skip HubSpot sync at end
+            - skip_email: bool - Skip email generation
+            - skip_script: bool - Skip script selection
+    """
+
+    lead: Lead
+    process_config: dict[str, Any]
+
+
+class OrchestratorOutput(TypedDict):
+    """Output schema for Master Orchestrator Agent.
+
+    This defines the fields returned to callers after orchestration
+    completes. It excludes intermediate state fields that are only
+    used internally during processing.
+
+    Key outputs:
+        tier: The qualification tier (Tier 1/2/3 or Not ICP)
+        has_phone: Whether phone enrichment succeeded (CRITICAL for sales)
+        qualification_score: The weighted ICP score (0-100)
+        research_brief: Summary of research findings
+        script_result: Personalized call script (if generated)
+        email_result: Personalized email draft (if generated)
+        hubspot_sync_result: HubSpot sync status (if synced)
+        errors: List of any errors encountered during processing
+    """
+
+    tier: QualificationTier | None
+    has_phone: bool
+    qualification_score: float | None
+    research_brief: ResearchBrief | None
+    script_result: dict[str, Any] | None
+    email_result: dict[str, Any] | None
+    hubspot_sync_result: dict[str, Any] | None
+    errors: list[str]

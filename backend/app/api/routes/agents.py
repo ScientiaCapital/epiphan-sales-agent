@@ -27,6 +27,7 @@ from app.services.langgraph.agents import (
     QualificationAgent,
     ScriptSelectionAgent,
 )
+from app.services.langgraph.checkpointing import get_checkpointer
 from app.services.langgraph.states import QualificationTier, ResearchBrief
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -535,3 +536,46 @@ async def stream_email_generation(request: EmailRequest) -> StreamingResponse:
             "Connection": "keep-alive",
         },
     )
+
+
+# =============================================================================
+# Time-Travel Debugging Endpoint
+# =============================================================================
+
+
+@router.get("/debug/{thread_id}/history")
+async def get_agent_history(thread_id: str) -> dict[str, Any]:
+    """
+    Get checkpoint history for debugging agent execution.
+
+    This enables time-travel debugging by showing all state snapshots
+    for a given thread, allowing developers to understand execution flow.
+
+    Returns minimal data (checkpoint IDs and metadata) to avoid
+    returning potentially large state objects.
+
+    Args:
+        thread_id: The thread ID to retrieve history for
+
+    Returns:
+        Dictionary with thread_id, list of checkpoints, and count
+    """
+    checkpointer = get_checkpointer()
+
+    # Get state history from checkpointer
+    config = {"configurable": {"thread_id": thread_id}}
+
+    # Try to get history - return empty if thread doesn't exist
+    try:
+        history = []
+        async for checkpoint in checkpointer.alist(config):
+            history.append({
+                "checkpoint_id": checkpoint.config.get("configurable", {}).get(
+                    "checkpoint_id"
+                ),
+                "thread_id": thread_id,
+                "metadata": checkpoint.metadata,
+            })
+        return {"thread_id": thread_id, "checkpoints": history, "count": len(history)}
+    except Exception as e:
+        return {"thread_id": thread_id, "checkpoints": [], "error": str(e)}

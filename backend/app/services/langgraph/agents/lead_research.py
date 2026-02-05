@@ -16,7 +16,9 @@ from app.services.langgraph.tools.research_tools import (
     scrape_company_news,
     scrape_company_website,
 )
+from langgraph.cache.memory import InMemoryCache
 from langgraph.graph import END, StateGraph
+from langgraph.types import RetryPolicy
 
 
 class LeadResearchAgent:
@@ -29,13 +31,24 @@ class LeadResearchAgent:
     def __init__(self) -> None:
         """Initialize the agent."""
         self._graph: StateGraph[LeadResearchState] | None = None
+        # Cache for Apollo enrichment results (1 hour TTL, avoids 8 credit duplicate calls)
+        self._cache: InMemoryCache[Any] = InMemoryCache()
 
     def _build_graph(self) -> StateGraph[LeadResearchState]:
         """Build the LangGraph state graph."""
         graph = StateGraph(LeadResearchState)
 
-        # Add nodes
-        graph.add_node("enrich_apis", self._enrich_apis_node)
+        # Add nodes with caching for expensive Apollo enrichment
+        # CachePolicy caches node results for 1 hour to avoid duplicate API calls (8 credits each)
+        graph.add_node(
+            "enrich_apis",
+            self._enrich_apis_node,
+            retry_policy=RetryPolicy(
+                max_attempts=3,
+                retry_on=(ConnectionError, TimeoutError, OSError),
+                backoff_factor=2.0,
+            ),
+        )
         graph.add_node("scrape_web", self._scrape_web_node)
         graph.add_node("synthesize", self._synthesize_node)
 
@@ -263,8 +276,8 @@ class LeadResearchAgent:
         if self._graph is None:
             self._graph = self._build_graph()
 
-        # Compile and run
-        compiled = self._graph.compile()
+        # Compile with cache for Apollo enrichment
+        compiled = self._graph.compile(cache=self._cache)
 
         # Initial state
         initial_state: LeadResearchState = {

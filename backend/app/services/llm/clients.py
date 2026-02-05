@@ -23,20 +23,48 @@ class LLMRouter:
     def __init__(self) -> None:
         """Initialize all LLM clients."""
         self._claude: ChatAnthropic | None = None
+        self._claude_thinking: ChatAnthropic | None = None
         self._cerebras: ChatOpenAI | None = None
         self._deepseek: ChatOpenAI | None = None
         self._openrouter: ChatOpenAI | None = None
 
     @property
     def claude(self) -> ChatAnthropic:
-        """Lazy-load Claude client."""
+        """Lazy-load Claude client with prompt caching enabled."""
         if self._claude is None:
             self._claude = ChatAnthropic(
                 model="claude-sonnet-4-20250514",
                 api_key=settings.anthropic_api_key,
                 max_tokens=4096,
+                # Enable prompt caching for ~10x speedup on system prompts >5k tokens
+                extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
             )
         return self._claude
+
+    @property
+    def claude_with_thinking(self) -> ChatAnthropic:
+        """Claude client with extended thinking for complex reasoning tasks.
+
+        Use this for tasks requiring deep analysis and multi-step reasoning:
+        - Complex ICP qualification decisions with edge cases
+        - Nuanced lead scoring requiring weighing multiple factors
+        - Competitive analysis requiring synthesis of multiple signals
+
+        Extended thinking allocates a "thinking budget" that allows Claude to
+        reason through problems step-by-step before providing a final answer,
+        improving accuracy on complex tasks.
+        """
+        if self._claude_thinking is None:
+            self._claude_thinking = ChatAnthropic(
+                model="claude-sonnet-4-20250514",
+                api_key=settings.anthropic_api_key,
+                max_tokens=8192,  # Higher for thinking + response
+                # Enable prompt caching for ~10x speedup on system prompts >5k tokens
+                extra_headers={"anthropic-beta": "prompt-caching-2024-07-31"},
+                # Enable extended thinking with budget
+                thinking={"type": "enabled", "budget_tokens": 2000},
+            )
+        return self._claude_thinking
 
     @property
     def cerebras(self) -> ChatOpenAI:
