@@ -564,22 +564,40 @@ class SupabaseClient:
         )
         return cast(dict[str, Any], result.data[0]) if result.data else None
 
-    def get_briefs_with_outcomes(self) -> list[dict[str, Any]]:
+    def get_briefs_with_outcomes(
+        self, persona_id: str | None = None
+    ) -> list[dict[str, Any]]:
         """
         Get call briefs joined with their outcomes for effectiveness analysis.
 
-        Returns a list of briefs that have linked outcomes, including
-        the outcome disposition and result for conversion tracking.
+        Returns a list of briefs with linked outcome data for conversion tracking.
+
+        Args:
+            persona_id: Optional persona filter (Python-side if JSONB path filter unavailable)
 
         Returns:
             List of brief records with outcome data
         """
         result = (
             self.client.table("call_briefs")
-            .select("*, call_outcomes(id, disposition, result, objections)")
+            .select(
+                "*, call_outcomes(id, disposition, result, objections, "
+                "buying_signals, competitor_mentioned, phone_type, "
+                "duration_seconds, called_at)"
+            )
             .execute()
         )
-        return cast(list[dict[str, Any]], result.data) if result.data else []
+        briefs = cast(list[dict[str, Any]], result.data) if result.data else []
+
+        # Python-side persona filtering (fine at ~20 calls/day scale)
+        if persona_id:
+            briefs = [
+                b for b in briefs
+                if (b.get("brief_json") or {}).get("contact", {}).get("persona_id") == persona_id
+                or (b.get("brief_json") or {}).get("qualification", {}).get("persona") == persona_id
+            ]
+
+        return briefs
 
 
 @lru_cache

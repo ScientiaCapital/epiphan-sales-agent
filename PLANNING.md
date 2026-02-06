@@ -49,12 +49,18 @@
 - `GET /api/leads/ready-to-dial` - Daily call list with tier/phone filtering
 - `GET /api/leads/{id}` - Single lead
 
+### Authentication
+- `POST /api/auth/token` - Issue JWT (API key → bearer token exchange)
+
 ### Call Outcome Tracking
 - `POST /api/call-outcomes` - Log a call outcome
 - `POST /api/call-outcomes/batch` - Batch log (end-of-day catch-up)
 - `GET /api/call-outcomes/stats` - Daily stats (?date=YYYY-MM-DD)
 - `GET /api/call-outcomes/stats/range` - Date range stats (?start=&end=)
 - `GET /api/call-outcomes/follow-ups` - Pending follow-ups (?date=&include_overdue=true)
+- `GET /api/call-outcomes/brief-effectiveness` - Brief quality → conversion analytics (enhanced)
+- `GET /api/call-outcomes/brief-effectiveness/persona/{persona_id}` - Per-persona deep dive
+- `GET /api/call-outcomes/brief-effectiveness/scripts` - Script matrix (persona x trigger)
 - `GET /api/call-outcomes/lead/{lead_id}` - Lead call history
 - `POST /api/call-outcomes/{outcome_id}/hubspot-sync` - Manual HubSpot sync
 
@@ -105,3 +111,18 @@
 - Lead status auto-updated on meeting_booked, qualified_out, dead
 - Business day calculation for follow-up dates (skips weekends)
 - No AI/LLM calls — pure data tracking + auto-scheduling
+
+### 6. Brief Effectiveness Deep Analytics
+- `ConversionFunnel` as reusable building block (persona, tier, trigger, overall)
+- Rates as percentages (0-100), not ratios (0-1)
+- Connected-only duration (voicemails/no-answer excluded from avg)
+- Top items with counts: `[{"budget": 5}, {"timing": 3}]`
+- Sample size warnings (< 5 outcomes) to prevent over-indexing
+- Python-side JSONB persona filtering (acceptable at ~20 calls/day scale)
+- Backward compatible with original brief-effectiveness response shape
+
+### 7. JWT API Authentication
+- Bearer token required on all non-public endpoints
+- 15-minute token expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
+- Constant-time API key comparison (timing-safe)
+- Public routes: /health, /, /docs, /api/auth/token, webhooks (HMAC auth)

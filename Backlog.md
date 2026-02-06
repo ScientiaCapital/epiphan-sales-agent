@@ -1,16 +1,18 @@
 # Product Backlog
 
 ## Priority 1 - Production Deployment
-- [ ] Add API authentication (API key or JWT)
+- [x] Add API authentication (JWT with bearer tokens) ✅ 2026-02-06
 - [ ] Set up production environment variables
-- [ ] Run SQL migrations (001, 002, 003, 004)
+- [ ] Run SQL migrations (001, 002, 003, 004, 005)
 - [ ] Configure public webhook URLs
 - [ ] Set up monitoring/alerting
+- [ ] Deploy Docker container to production
 
 ## Priority 2 - Frontend
 - [ ] Build monitoring dashboard UI
 - [ ] Phone approval interface
 - [ ] Call brief viewer / daily call list UI
+- [ ] Brief effectiveness analytics dashboard
 - [ ] Batch status viewer
 
 ## Priority 3 - Enhanced Features
@@ -26,6 +28,27 @@
 ---
 
 ## Completed
+
+### Brief Effectiveness Deep Analytics (DONE - 2026-02-06)
+- [x] 10 new Pydantic models (ConversionFunnel, PhoneTypeImpact, TierAnalytics, etc.)
+- [x] Enhanced `GET /brief-effectiveness` — persona summaries, tier analytics, phone impact, overall funnel
+- [x] `GET /brief-effectiveness/persona/{persona_id}` — per-trigger deep dive
+- [x] `GET /brief-effectiveness/scripts` — persona x trigger matrix ranked by meeting rate
+- [x] 6 private service helpers for reusable analytics computation
+- [x] 55 new tests (11 test classes)
+
+### Call Brief ↔ Outcome Linkage (DONE - 2026-02-06)
+- [x] Migration `005_add_call_briefs.sql` — call_briefs table + call_brief_id FK
+- [x] Brief persistence + outcome linkage
+- [x] Basic effectiveness analytics endpoint
+- [x] 19 new tests
+
+### JWT API Authentication + Docker (DONE - 2026-02-06)
+- [x] JWT middleware (15-min tokens, constant-time key comparison)
+- [x] `POST /api/auth/token` endpoint
+- [x] Bearer token required on all non-public endpoints
+- [x] Multi-stage Docker build (python:3.12-slim, non-root, healthcheck)
+- [x] 19 new tests
 
 ### Call Outcome Tracking (DONE - 2026-02-05)
 - [x] Migration `004_add_call_outcomes.sql` — new table with 5 indexes
@@ -89,11 +112,8 @@
 - [x] Background processing pipeline
 
 ### Testing (DONE)
-- [x] 1069 tests (1064 passed, 5 skipped)
+- [x] 1162 tests (1157 passed, 5 skipped)
 - [x] Comprehensive test coverage for all features
 
 ### Tech Debt Resolution (DONE)
 - [x] Fix mypy type stub issues (fastapi, hubspot) - strict mode compliant
-
-### Cleanup (DONE)
-- [x] Removed Clearbit enrichment (consolidated to Apollo-only)

@@ -298,6 +298,30 @@ JWT API authentication, Docker deployment, doc hygiene.
 
 ---
 
+## Recent Work (2026-02-06) - Brief Effectiveness Deep Analytics
+**Branch**: `main`
+
+Deep analytics for call brief effectiveness: per-persona deep dives, script matrix, tier analytics, phone type impact. All data from existing `brief_json` JSONB + `call_outcomes` — no new migrations.
+
+### New Files
+- `tests/unit/test_brief_effectiveness_scoring.py` (55 tests) — 11 test classes: funnel builder, phone impact, top items, avg duration, persona extraction, tier extraction, enhanced effectiveness, persona deep dive, script matrix, API endpoints, edge cases
+
+### Modified Files
+- `app/data/call_outcome_schemas.py` — Added 10 Pydantic models: ConversionFunnel, QualityConversion, PhoneTypeImpact, TierAnalytics, PersonaSummary, ScriptTriggerPerformance, ScriptTemplateRow, BriefEffectivenessResponse, PersonaEffectivenessDetail, ScriptEffectivenessResponse
+- `app/services/call_outcomes/service.py` — Refactored `get_brief_effectiveness()` to return typed `BriefEffectivenessResponse`. Added `get_persona_effectiveness()`, `get_script_effectiveness()`, and 6 private helpers
+- `app/services/database/supabase_client.py` — Expanded `get_briefs_with_outcomes()` select fields + optional `persona_id` param with Python-side filtering
+- `app/api/routes/call_outcomes.py` — Added `GET /brief-effectiveness/persona/{persona_id}` and `GET /brief-effectiveness/scripts` endpoints
+
+### Key Features
+- **ConversionFunnel**: Reusable building block model used across persona, tier, trigger, and overall contexts
+- **Persona Deep Dive**: Per-trigger conversion funnels, top objections/signals with counts, phone type impact
+- **Script Matrix**: Every persona x trigger combination ranked by meeting rate with sample size warnings (< 5)
+- **Backward Compatible**: Enhanced response preserves all 5 original fields from basic brief-effectiveness
+
+**Code Quality**: 1157 tests passed, 5 skipped, 0 mypy errors, 0 ruff errors (55 new tests)
+
+---
+
 ## Recent Work (2026-02-06) - Call Brief ↔ Outcome Linkage
 **Branch**: `main`
 

@@ -9,17 +9,27 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from app.data.call_outcome_schemas import (
+    BriefEffectivenessResponse,
     CallDisposition,
     CallOutcomeCreate,
     CallOutcomeLogResult,
     CallOutcomeResponse,
     CallResult,
+    ConversionFunnel,
     DailyCallStats,
     FollowUpType,
     LeadCallHistory,
     PendingFollowUp,
     PendingFollowUpsResponse,
+    PersonaEffectivenessDetail,
+    PersonaSummary,
     PhoneTypeBreakdown,
+    PhoneTypeImpact,
+    QualityConversion,
+    ScriptEffectivenessResponse,
+    ScriptTemplateRow,
+    ScriptTriggerPerformance,
+    TierAnalytics,
 )
 from app.services.database.supabase_client import supabase_client
 from app.services.integrations.hubspot.client import hubspot_client
@@ -332,13 +342,11 @@ class CallOutcomeService:
 
         return {"synced": True, "hubspot_engagement_id": engagement_id}
 
-    def get_brief_effectiveness(self) -> dict[str, Any]:
+    def get_brief_effectiveness(self) -> BriefEffectivenessResponse:
         """
-        Analyze call brief effectiveness — which brief qualities lead to meetings.
+        Analyze call brief effectiveness — enhanced with persona, tier, phone, and funnel data.
 
-        Returns:
-            Dict with conversion rates by quality, objection prediction accuracy,
-            and average brief quality for meetings.
+        Backward compatible: all 5 original fields preserved.
         """
         briefs_with_outcomes = supabase_client.get_briefs_with_outcomes()
 
@@ -353,12 +361,23 @@ class CallOutcomeService:
         objection_matches = 0
         objection_comparisons = 0
         meeting_qualities: list[str] = []
+        all_outcomes: list[dict[str, Any]] = []
+
+        # Group by persona and tier
+        persona_outcomes: dict[str, list[dict[str, Any]]] = {}
+        persona_titles: dict[str, str] = {}
+        tier_outcomes: dict[str, list[dict[str, Any]]] = {}
+        tier_scores: dict[str, list[float]] = {}
 
         for brief in briefs_with_outcomes:
             total_briefs += 1
             quality = (brief.get("brief_quality") or "medium").upper()
             if quality not in quality_stats:
                 quality = "MEDIUM"
+
+            brief_json = brief.get("brief_json") or {}
+            persona_id, persona_title = self._extract_persona_from_brief(brief_json)
+            tier = self._extract_tier_from_brief(brief_json)
 
             outcomes = brief.get("call_outcomes", [])
             if not outcomes:
@@ -367,14 +386,27 @@ class CallOutcomeService:
             for outcome in outcomes:
                 total_linked += 1
                 quality_stats[quality]["total"] += 1
+                all_outcomes.append(outcome)
 
                 if outcome.get("result") == "meeting_booked":
                     quality_stats[quality]["meetings"] += 1
                     meeting_qualities.append(quality)
 
+                # Group by persona
+                if persona_id:
+                    persona_outcomes.setdefault(persona_id, []).append(outcome)
+                    if persona_title:
+                        persona_titles[persona_id] = persona_title
+
+                # Group by tier
+                if tier:
+                    tier_outcomes.setdefault(tier, []).append(outcome)
+                    score = (brief_json.get("qualification") or {}).get("score")
+                    if score is not None:
+                        tier_scores.setdefault(tier, []).append(float(score))
+
                 # Check objection prediction accuracy
-                brief_json = brief.get("brief_json", {})
-                predicted = brief_json.get("objection_prep", {}).get("objections", [])
+                predicted = (brief_json.get("objection_prep") or {}).get("objections", [])
                 actual = outcome.get("objections") or []
                 if predicted and actual:
                     objection_comparisons += 1
@@ -387,16 +419,16 @@ class CallOutcomeService:
                     if predicted_texts & actual_lower:
                         objection_matches += 1
 
-        # Calculate rates
-        conversion_by_quality = {}
+        # Build quality conversion models
+        conversion_by_quality: dict[str, QualityConversion] = {}
         for q, stats in quality_stats.items():
             total = stats["total"]
             meetings = stats["meetings"]
-            conversion_by_quality[q] = {
-                "total": total,
-                "meetings": meetings,
-                "rate": round(meetings / total, 2) if total > 0 else 0.0,
-            }
+            conversion_by_quality[q] = QualityConversion(
+                total=total,
+                meetings=meetings,
+                rate=round(meetings / total * 100, 1) if total > 0 else 0.0,
+            )
 
         objection_accuracy = (
             round(objection_matches / objection_comparisons, 2)
@@ -408,16 +440,253 @@ class CallOutcomeService:
             set(meeting_qualities), key=meeting_qualities.count
         ) if meeting_qualities else "N/A"
 
-        return {
-            "total_briefs_used": total_briefs,
-            "total_outcomes_linked": total_linked,
-            "conversion_by_quality": conversion_by_quality,
-            "objection_prediction_accuracy": objection_accuracy,
-            "avg_brief_quality_for_meetings": avg_quality,
-        }
+        # Build persona summaries
+        persona_summaries = []
+        for pid, p_outcomes in persona_outcomes.items():
+            persona_summaries.append(PersonaSummary(
+                persona_id=pid,
+                persona_title=persona_titles.get(pid),
+                funnel=self._build_conversion_funnel(p_outcomes, total_briefs=len([
+                    b for b in briefs_with_outcomes
+                    if self._extract_persona_from_brief(b.get("brief_json") or {})[0] == pid
+                ])),
+                avg_duration=self._compute_avg_duration(p_outcomes),
+                top_objections=self._extract_top_items(p_outcomes, "objections"),
+                top_buying_signals=self._extract_top_items(p_outcomes, "buying_signals"),
+            ))
+
+        # Build tier analytics
+        tier_analytics = []
+        for t, t_outcomes in tier_outcomes.items():
+            scores = tier_scores.get(t, [])
+            tier_analytics.append(TierAnalytics(
+                tier=t,
+                funnel=self._build_conversion_funnel(t_outcomes),
+                avg_duration=self._compute_avg_duration(t_outcomes),
+                avg_score=round(sum(scores) / len(scores), 1) if scores else 0.0,
+            ))
+
+        return BriefEffectivenessResponse(
+            total_briefs_used=total_briefs,
+            total_outcomes_linked=total_linked,
+            conversion_by_quality=conversion_by_quality,
+            objection_prediction_accuracy=objection_accuracy,
+            avg_brief_quality_for_meetings=avg_quality,
+            persona_effectiveness=persona_summaries,
+            tier_analytics=tier_analytics,
+            phone_type_impact=self._compute_phone_type_impact(all_outcomes),
+            overall_funnel=self._build_conversion_funnel(all_outcomes, total_briefs=total_briefs),
+        )
+
+    def get_persona_effectiveness(self, persona_id: str) -> PersonaEffectivenessDetail:
+        """
+        Deep dive into a specific persona's effectiveness.
+
+        Args:
+            persona_id: Persona identifier (e.g., 'av_director')
+
+        Returns:
+            Per-trigger breakdown, top objections/signals, phone impact
+        """
+        briefs = supabase_client.get_briefs_with_outcomes(persona_id=persona_id)
+
+        all_outcomes: list[dict[str, Any]] = []
+        trigger_outcomes: dict[str, list[dict[str, Any]]] = {}
+        persona_title: str | None = None
+
+        for brief in briefs:
+            brief_json = brief.get("brief_json") or {}
+            _, title = self._extract_persona_from_brief(brief_json)
+            if title:
+                persona_title = title
+
+            trigger = (brief_json.get("trigger") or brief.get("trigger") or "unknown")
+            outcomes = brief.get("call_outcomes", [])
+            for outcome in outcomes:
+                all_outcomes.append(outcome)
+                trigger_outcomes.setdefault(trigger, []).append(outcome)
+
+        # Build per-trigger breakdown
+        by_trigger = []
+        for trig, t_outcomes in trigger_outcomes.items():
+            by_trigger.append(ScriptTriggerPerformance(
+                trigger=trig,
+                funnel=self._build_conversion_funnel(t_outcomes),
+                avg_duration=self._compute_avg_duration(t_outcomes),
+                sample_size_warning=len(t_outcomes) < 5,
+            ))
+
+        return PersonaEffectivenessDetail(
+            persona_id=persona_id,
+            persona_title=persona_title,
+            overall_funnel=self._build_conversion_funnel(all_outcomes, total_briefs=len(briefs)),
+            by_trigger=by_trigger,
+            top_objections=self._extract_top_items(all_outcomes, "objections"),
+            top_buying_signals=self._extract_top_items(all_outcomes, "buying_signals"),
+            phone_type_impact=self._compute_phone_type_impact(all_outcomes),
+            avg_duration=self._compute_avg_duration(all_outcomes),
+        )
+
+    def get_script_effectiveness(self) -> ScriptEffectivenessResponse:
+        """
+        Script matrix — every persona x trigger combination ranked by meeting rate.
+        """
+        briefs = supabase_client.get_briefs_with_outcomes()
+
+        # Group outcomes by (persona, trigger)
+        combo_outcomes: dict[tuple[str | None, str | None], list[dict[str, Any]]] = {}
+
+        for brief in briefs:
+            brief_json = brief.get("brief_json") or {}
+            persona_id, _ = self._extract_persona_from_brief(brief_json)
+            trigger = brief_json.get("trigger") or brief.get("trigger")
+
+            outcomes = brief.get("call_outcomes", [])
+            for outcome in outcomes:
+                combo_outcomes.setdefault((persona_id, trigger), []).append(outcome)
+
+        rows: list[ScriptTemplateRow] = []
+        for (persona, trigger), outcomes in combo_outcomes.items():
+            rows.append(ScriptTemplateRow(
+                persona=persona,
+                trigger=trigger,
+                funnel=self._build_conversion_funnel(outcomes),
+                avg_duration=self._compute_avg_duration(outcomes),
+                sample_size_warning=len(outcomes) < 5,
+            ))
+
+        # Sort by meeting rate descending
+        rows.sort(key=lambda r: r.funnel.meeting_rate, reverse=True)
+
+        # Best/worst with minimum 5 sample threshold
+        eligible = [r for r in rows if not r.sample_size_warning]
+        best = eligible[0] if eligible else None
+        worst = eligible[-1] if eligible else None
+
+        return ScriptEffectivenessResponse(
+            rows=rows,
+            best_performing=best,
+            worst_performing=worst,
+        )
 
     # =========================================================================
-    # Private helpers
+    # Private helpers — effectiveness analytics
+    # =========================================================================
+
+    @staticmethod
+    def _build_conversion_funnel(
+        outcomes: list[dict[str, Any]], total_briefs: int = 0
+    ) -> ConversionFunnel:
+        """Build a ConversionFunnel from a list of outcome dicts."""
+        total_outcomes = len(outcomes)
+        connections = sum(
+            1 for o in outcomes if o.get("disposition") == "connected"
+        )
+        meetings = sum(1 for o in outcomes if o.get("result") == "meeting_booked")
+        follow_ups = sum(1 for o in outcomes if o.get("result") == "follow_up_needed")
+        qualified_out = sum(1 for o in outcomes if o.get("result") == "qualified_out")
+        nurture = sum(1 for o in outcomes if o.get("result") == "nurture")
+        dead = sum(1 for o in outcomes if o.get("result") == "dead")
+        no_contact = sum(1 for o in outcomes if o.get("result") == "no_contact")
+
+        connect_rate = round(connections / total_outcomes * 100, 1) if total_outcomes > 0 else 0.0
+        meeting_rate = round(meetings / connections * 100, 1) if connections > 0 else 0.0
+        conversion_rate = round(meetings / total_outcomes * 100, 1) if total_outcomes > 0 else 0.0
+
+        return ConversionFunnel(
+            total_briefs=total_briefs,
+            total_outcomes=total_outcomes,
+            connections=connections,
+            meetings_booked=meetings,
+            follow_ups=follow_ups,
+            qualified_out=qualified_out,
+            nurture=nurture,
+            dead=dead,
+            no_contact=no_contact,
+            connect_rate=connect_rate,
+            meeting_rate=meeting_rate,
+            conversion_rate=conversion_rate,
+        )
+
+    @staticmethod
+    def _compute_phone_type_impact(
+        outcomes: list[dict[str, Any]]
+    ) -> list[PhoneTypeImpact]:
+        """Compute phone type effectiveness from outcomes."""
+        phone_data: dict[str, dict[str, int]] = {}
+        for o in outcomes:
+            pt = (o.get("phone_type") or "unknown").lower()
+            stats = phone_data.setdefault(pt, {"dials": 0, "connections": 0, "meetings": 0})
+            stats["dials"] += 1
+            if o.get("disposition") == "connected":
+                stats["connections"] += 1
+            if o.get("result") == "meeting_booked":
+                stats["meetings"] += 1
+
+        result = []
+        for pt, stats in phone_data.items():
+            dials = stats["dials"]
+            connections = stats["connections"]
+            meetings = stats["meetings"]
+            result.append(PhoneTypeImpact(
+                phone_type=pt,
+                dials=dials,
+                connections=connections,
+                meetings=meetings,
+                connect_rate=round(connections / dials * 100, 1) if dials > 0 else 0.0,
+                meeting_rate=round(meetings / connections * 100, 1) if connections > 0 else 0.0,
+            ))
+        return result
+
+    @staticmethod
+    def _extract_top_items(
+        outcomes: list[dict[str, Any]], field: str, limit: int = 3
+    ) -> list[dict[str, int]]:
+        """Extract frequency-sorted top items from an outcome field (objections/buying_signals)."""
+        counts: dict[str, int] = {}
+        for o in outcomes:
+            items = o.get(field) or []
+            for item in items:
+                if isinstance(item, str) and item.strip():
+                    counts[item.strip().lower()] = counts.get(item.strip().lower(), 0) + 1
+
+        sorted_items = sorted(counts.items(), key=lambda x: x[1], reverse=True)
+        return [{k: v} for k, v in sorted_items[:limit]]
+
+    @staticmethod
+    def _compute_avg_duration(outcomes: list[dict[str, Any]]) -> float:
+        """Compute average call duration for connected calls only."""
+        durations = [
+            o.get("duration_seconds", 0)
+            for o in outcomes
+            if o.get("disposition") == "connected"
+            and o.get("duration_seconds", 0) > 0
+        ]
+        return round(sum(durations) / len(durations), 1) if durations else 0.0
+
+    @staticmethod
+    def _extract_persona_from_brief(
+        brief_json: dict[str, Any]
+    ) -> tuple[str | None, str | None]:
+        """Extract persona_id and persona_title from brief_json."""
+        contact = brief_json.get("contact") or {}
+        persona_id = contact.get("persona_id")
+        persona_title = contact.get("persona_title") or contact.get("title")
+
+        if not persona_id:
+            qual = brief_json.get("qualification") or {}
+            persona_id = qual.get("persona")
+
+        return persona_id, persona_title
+
+    @staticmethod
+    def _extract_tier_from_brief(brief_json: dict[str, Any]) -> str | None:
+        """Extract tier from brief_json qualification data."""
+        qual = brief_json.get("qualification") or {}
+        return qual.get("tier")
+
+    # =========================================================================
+    # Private helpers — follow-up & lead management
     # =========================================================================
 
     def _get_follow_up_rule(

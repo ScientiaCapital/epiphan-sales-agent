@@ -179,3 +179,118 @@ class LeadCallHistory(BaseModel):
     total_connections: int
     last_called: datetime | None = None
     outcomes: list[CallOutcomeResponse]
+
+
+# =============================================================================
+# Brief Effectiveness Analytics Models
+# =============================================================================
+
+
+class ConversionFunnel(BaseModel):
+    """Reusable funnel metrics — used across persona, tier, trigger, and overall contexts."""
+
+    total_briefs: int = 0
+    total_outcomes: int = 0
+    connections: int = 0
+    meetings_booked: int = 0
+    follow_ups: int = 0
+    qualified_out: int = 0
+    nurture: int = 0
+    dead: int = 0
+    no_contact: int = 0
+    connect_rate: float = 0.0
+    meeting_rate: float = 0.0
+    conversion_rate: float = 0.0
+
+
+class QualityConversion(BaseModel):
+    """Conversion stats for a single brief quality level."""
+
+    total: int = 0
+    meetings: int = 0
+    rate: float = 0.0
+
+
+class PhoneTypeImpact(BaseModel):
+    """Phone type effectiveness — which phone types lead to meetings."""
+
+    phone_type: str
+    dials: int = 0
+    connections: int = 0
+    meetings: int = 0
+    connect_rate: float = 0.0
+    meeting_rate: float = 0.0
+
+
+class TierAnalytics(BaseModel):
+    """Per-tier funnel analytics."""
+
+    tier: str
+    funnel: ConversionFunnel = Field(default_factory=ConversionFunnel)
+    avg_duration: float = 0.0
+    avg_score: float = 0.0
+
+
+class PersonaSummary(BaseModel):
+    """Per-persona effectiveness summary for the main endpoint."""
+
+    persona_id: str | None = None
+    persona_title: str | None = None
+    funnel: ConversionFunnel = Field(default_factory=ConversionFunnel)
+    avg_duration: float = 0.0
+    top_objections: list[dict[str, int]] = Field(default_factory=list)
+    top_buying_signals: list[dict[str, int]] = Field(default_factory=list)
+
+
+class ScriptTriggerPerformance(BaseModel):
+    """Per-trigger performance within a persona deep dive."""
+
+    trigger: str
+    funnel: ConversionFunnel = Field(default_factory=ConversionFunnel)
+    avg_duration: float = 0.0
+    sample_size_warning: bool = False
+
+
+class ScriptTemplateRow(BaseModel):
+    """One row in the script effectiveness matrix (persona x trigger)."""
+
+    persona: str | None = None
+    trigger: str | None = None
+    funnel: ConversionFunnel = Field(default_factory=ConversionFunnel)
+    avg_duration: float = 0.0
+    sample_size_warning: bool = False
+
+
+class BriefEffectivenessResponse(BaseModel):
+    """Enhanced brief effectiveness response — backward compatible with existing fields."""
+
+    total_briefs_used: int = 0
+    total_outcomes_linked: int = 0
+    conversion_by_quality: dict[str, QualityConversion] = Field(default_factory=dict)
+    objection_prediction_accuracy: float = 0.0
+    avg_brief_quality_for_meetings: str = "N/A"
+    persona_effectiveness: list[PersonaSummary] = Field(default_factory=list)
+    tier_analytics: list[TierAnalytics] = Field(default_factory=list)
+    phone_type_impact: list[PhoneTypeImpact] = Field(default_factory=list)
+    overall_funnel: ConversionFunnel = Field(default_factory=ConversionFunnel)
+
+
+class PersonaEffectivenessDetail(BaseModel):
+    """Persona deep dive — per-trigger breakdown with top objections/signals."""
+
+    persona_id: str
+    persona_title: str | None = None
+    overall_funnel: ConversionFunnel = Field(default_factory=ConversionFunnel)
+    by_trigger: list[ScriptTriggerPerformance] = Field(default_factory=list)
+    top_objections: list[dict[str, int]] = Field(default_factory=list)
+    top_buying_signals: list[dict[str, int]] = Field(default_factory=list)
+    phone_type_impact: list[PhoneTypeImpact] = Field(default_factory=list)
+    avg_duration: float = 0.0
+
+
+class ScriptEffectivenessResponse(BaseModel):
+    """Script matrix — every persona x trigger combination ranked by meeting rate."""
+
+    rows: list[ScriptTemplateRow] = Field(default_factory=list)
+    best_performing: ScriptTemplateRow | None = None
+    worst_performing: ScriptTemplateRow | None = None

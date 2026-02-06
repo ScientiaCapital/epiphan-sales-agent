@@ -16,13 +16,17 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.data.call_outcome_schemas import (
+    BriefEffectivenessResponse,
     CallOutcomeBatchCreate,
     CallOutcomeCreate,
     CallOutcomeLogResult,
     DailyCallStats,
     LeadCallHistory,
     PendingFollowUpsResponse,
+    PersonaEffectivenessDetail,
+    ScriptEffectivenessResponse,
 )
+from app.data.schemas import PersonaType
 from app.middleware.auth import require_auth
 from app.services.call_outcomes.service import call_outcome_service
 from app.services.database.supabase_client import supabase_client
@@ -161,14 +165,44 @@ async def get_pending_follow_ups(
     )
 
 
-@router.get("/brief-effectiveness")
-async def get_brief_effectiveness() -> dict[str, Any]:
-    """Analyze call brief effectiveness — which brief qualities lead to meetings.
+@router.get("/brief-effectiveness", response_model=BriefEffectivenessResponse)
+async def get_brief_effectiveness() -> BriefEffectivenessResponse:
+    """Analyze call brief effectiveness — enhanced deep analytics.
 
-    Returns conversion rates by brief quality level, objection prediction
-    accuracy, and average brief quality for meetings booked.
+    Returns conversion rates by quality, persona summaries, tier analytics,
+    phone type impact, and overall funnel. Backward compatible with original fields.
     """
     return call_outcome_service.get_brief_effectiveness()
+
+
+@router.get(
+    "/brief-effectiveness/persona/{persona_id}",
+    response_model=PersonaEffectivenessDetail,
+)
+async def get_persona_effectiveness(persona_id: str) -> PersonaEffectivenessDetail:
+    """Deep dive into a persona's call brief effectiveness.
+
+    Returns per-trigger conversion funnels, top objections, top buying signals,
+    and phone type impact for a specific persona.
+    """
+    # Validate persona_id against known personas
+    valid_personas = {p.value for p in PersonaType}
+    if persona_id not in valid_personas:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown persona: {persona_id}. Valid: {sorted(valid_personas)}",
+        )
+    return call_outcome_service.get_persona_effectiveness(persona_id)
+
+
+@router.get("/brief-effectiveness/scripts", response_model=ScriptEffectivenessResponse)
+async def get_script_effectiveness() -> ScriptEffectivenessResponse:
+    """Script effectiveness matrix — every persona x trigger ranked by meeting rate.
+
+    Returns rows with conversion funnels, best/worst performing combos
+    (minimum 5 samples), and sample size warnings.
+    """
+    return call_outcome_service.get_script_effectiveness()
 
 
 @router.get("/lead/{lead_id}", response_model=LeadCallHistory)
