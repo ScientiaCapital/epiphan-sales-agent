@@ -128,12 +128,15 @@ def enrich_phone_numbers(
     harvester_mobile: str | None = None,
     harvester_work: str | None = None,
     harvester_company: str | None = None,
+    clay_phones: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """
-    Extract and prioritize phone numbers from Apollo data and Harvester.
+    Extract and prioritize phone numbers from Apollo, Harvester, and Clay.
 
     PHONES ARE GOLD FOR BDR OUTREACH!
-    Priority order (best to worst):
+    Priority order: Apollo (primary) > Harvester (secondary) > Clay (tertiary)
+
+    Phone type priority (best to worst):
     1. Direct dial - Best: reaches decision-maker directly
     2. Mobile - Good: personal, high answer rate
     3. Work line - OK: may go to voicemail/assistant
@@ -145,6 +148,7 @@ def enrich_phone_numbers(
         harvester_mobile: Mobile phone from Harvester
         harvester_work: Work phone from Harvester
         harvester_company: Company phone from Harvester
+        clay_phones: Phone list from Clay [{number, type, provider}]
 
     Returns:
         Dict with phone numbers and source tracking:
@@ -213,6 +217,27 @@ def enrich_phone_numbers(
     if harvester_company and not result["company_phone"]:
         result["company_phone"] = harvester_company
         sources_used.append("harvester")
+
+    # Fill remaining gaps with Clay data (TERTIARY SOURCE — fallback)
+    if clay_phones:
+        for phone in clay_phones:
+            number = phone.get("number", "").strip()
+            if not number:
+                continue
+            phone_type = phone.get("type", "").lower()
+
+            if phone_type == "work_direct" and not result["direct_phone"]:
+                result["direct_phone"] = number
+                sources_used.append("clay")
+            elif phone_type == "mobile" and not result["mobile_phone"]:
+                result["mobile_phone"] = number
+                sources_used.append("clay")
+            elif phone_type == "work" and not result["work_phone"]:
+                result["work_phone"] = number
+                sources_used.append("clay")
+            elif phone_type == "work_hq" and not result["company_phone"]:
+                result["company_phone"] = number
+                sources_used.append("clay")
 
     # Determine best phone (PHONES ARE GOLD - priority matters!)
     result["best_phone"] = (

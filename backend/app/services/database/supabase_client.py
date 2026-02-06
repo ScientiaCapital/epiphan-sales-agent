@@ -600,6 +600,107 @@ class SupabaseClient:
         return briefs
 
 
+    # =================================================================
+    # Clay Enrichment (Fallback — 75+ provider waterfall)
+    # =================================================================
+
+    def store_clay_enrichment(
+        self,
+        lead_id: str,
+        data: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Store Clay enrichment result (upsert by lead_id).
+
+        PHONES ARE GOLD! Clay fills gaps when Apollo can't find phones.
+
+        Args:
+            lead_id: Lead identifier
+            data: Enrichment data including phones, emails, firmographics
+
+        Returns:
+            Inserted/updated record
+        """
+        import json
+
+        record = {
+            "lead_id": lead_id,
+            "phones": json.dumps(data.get("phones", [])),
+            "emails": json.dumps(data.get("emails", [])),
+            "company_name": data.get("company_name"),
+            "industry": data.get("industry"),
+            "employee_count": data.get("employee_count"),
+            "revenue_range": data.get("revenue_range"),
+            "technologies": json.dumps(data.get("technologies", [])),
+            "linkedin_url": data.get("linkedin_url"),
+            "funding_info": json.dumps(data.get("funding_info")) if data.get("funding_info") else None,
+            "raw_payload": json.dumps(data.get("raw_payload", {})),
+            "synced_to_hubspot": False,
+        }
+
+        result = (
+            self.client.table("clay_enrichment_results")
+            .upsert(record, on_conflict="lead_id")
+            .execute()
+        )
+        return cast(dict[str, Any], result.data[0]) if result.data else {}
+
+    def get_clay_enrichment(self, lead_id: str) -> dict[str, Any] | None:
+        """
+        Get Clay enrichment result for a lead.
+
+        Args:
+            lead_id: Lead identifier
+
+        Returns:
+            Enrichment record or None if not found
+        """
+        result = (
+            self.client.table("clay_enrichment_results")
+            .select("*")
+            .eq("lead_id", lead_id)
+            .execute()
+        )
+        if result.data:
+            return cast(dict[str, Any], result.data[0])
+        return None
+
+    def get_unsynced_clay_enrichments(self, limit: int = 100) -> list[dict[str, Any]]:
+        """
+        Get Clay enrichment records pending HubSpot sync.
+
+        Returns:
+            List of records with synced_to_hubspot=FALSE
+        """
+        result = (
+            self.client.table("clay_enrichment_results")
+            .select("*")
+            .eq("synced_to_hubspot", False)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data or []
+
+    def mark_clay_synced(self, enrichment_id: str) -> None:
+        """
+        Mark a Clay enrichment record as synced to HubSpot.
+
+        Args:
+            enrichment_id: UUID of the clay_enrichment_results record
+        """
+        from datetime import datetime, timezone
+
+        (
+            self.client.table("clay_enrichment_results")
+            .update({
+                "synced_to_hubspot": True,
+                "synced_at": datetime.now(timezone.utc).isoformat(),
+            })
+            .eq("id", enrichment_id)
+            .execute()
+        )
+
 @lru_cache
 def get_supabase_client() -> SupabaseClient:
     """Get cached Supabase client instance."""

@@ -25,6 +25,7 @@ class EnrichmentType(str, Enum):
     LEGACY = "legacy"  # Always-reveal-phones approach
     BASIC = "basic"  # No phone reveal
     COMPANY = "company"  # Company enrichment only
+    CLAY = "clay"  # Clay.com fallback enrichment (75+ providers)  # Company enrichment only
 
 
 class EnrichmentStatus(str, Enum):
@@ -374,6 +375,49 @@ class EnrichmentAuditLogger:
             any_phone_found=bool(direct_phone or mobile_phone or work_phone),
             rate_limit_hit=rate_limit_hit,
             error_message=error,
+        )
+
+        self.log_enrichment(entry)
+        return entry
+
+    def log_clay_enrichment(
+        self,
+        external_id: str,
+        email: str | None,
+        action: str,
+        phones_found: int = 0,
+        emails_found: int = 0,
+        success: bool = True,
+        error: str | None = None,
+    ) -> EnrichmentAuditEntry:
+        """
+        Log a Clay enrichment event (push or webhook receive).
+
+        Args:
+            external_id: Lead external identifier
+            email: Lead email
+            action: "push" (sent to Clay) or "webhook_received" (got results back)
+            phones_found: Number of phones Clay found
+            emails_found: Number of emails Clay found
+            success: Whether the operation succeeded
+            error: Error message if failed
+        """
+        status = EnrichmentStatus.SUCCESS if success else EnrichmentStatus.API_ERROR
+
+        entry = EnrichmentAuditEntry(
+            batch_id=self.batch_id,
+            external_id=external_id,
+            email=email,
+            enrichment_type=EnrichmentType.CLAY,
+            status=status,
+            credits_used=0,  # Clay credits are managed on Clay's side
+            any_phone_found=phones_found > 0,
+            error_message=error,
+        )
+
+        logger.info(
+            "Clay %s: lead=%s phones=%d emails=%d",
+            action, external_id, phones_found, emails_found,
         )
 
         self.log_enrichment(entry)

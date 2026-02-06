@@ -1,7 +1,9 @@
-"""Apollo webhook endpoint for async phone delivery.
+"""Webhook endpoints for async enrichment delivery.
 
-PHONES ARE GOLD! Apollo delivers mobile/direct phones asynchronously.
-This webhook receives them 2-10 minutes after the initial enrichment request.
+PHONES ARE GOLD! Webhook-based enrichment from multiple providers:
+- Apollo: delivers mobile/direct phones 2-10 minutes after enrichment
+- Harvester: real-time lead sync from Lead Harvester
+- Clay: fallback enrichment via 75+ provider waterfall
 
 More phones = More dials = More conversations = More deals = Food on the table for Tim.
 """
@@ -614,4 +616,151 @@ async def harvester_lead_push(request: Request) -> HarvesterPushResponse:
         leads_received=len(payload.leads),
         batch_id=batch_id,
         message=f"Leads queued for processing. Track at /api/monitoring/batches/{batch_id}",
+    )
+
+
+# =============================================================================
+# Clay.com Webhook — Fallback Enrichment (75+ providers)
+# =============================================================================
+
+
+class ClayEnrichmentWebhookPayload(BaseModel):
+    """Payload from Clay enrichment callback.
+
+    Clay enriches leads through its 75+ provider waterfall and POSTs
+    results back here. Phones, emails, firmographics, and tech stack.
+    """
+
+    lead_id: str
+    phones: list[dict[str, Any]] = []
+    emails: list[dict[str, Any]] = []
+    company_name: str | None = None
+    industry: str | None = None
+    employee_count: int | None = None
+    revenue_range: str | None = None
+    technologies: list[str] = []
+    linkedin_url: str | None = None
+    funding_info: dict[str, Any] | None = None
+
+
+class ClayWebhookResponse(BaseModel):
+    """Response to Clay enrichment callback."""
+
+    status: str
+    phones_received: int = 0
+    emails_received: int = 0
+    lead_id: str | None = None
+
+
+def verify_clay_signature(body: bytes, signature: str | None) -> bool:
+    """
+    Verify Clay webhook signature using HMAC-SHA256.
+
+    Follows same pattern as Apollo/Harvester verification.
+
+    Args:
+        body: Raw request body bytes
+        signature: Signature from x-clay-signature header
+
+    Returns:
+        True if signature is valid, False otherwise
+    """
+    if not settings.clay_webhook_secret:
+        if settings.environment == "production":
+            logger.warning("Clay webhook secret not configured in production!")
+            return False
+        return True
+
+    if not signature:
+        return False
+
+    expected = hmac.new(
+        settings.clay_webhook_secret.encode(),
+        body,
+        hashlib.sha256,
+    ).hexdigest()
+
+    sig_to_check = signature
+    if signature.startswith("sha256="):
+        sig_to_check = signature[7:]
+
+    return hmac.compare_digest(sig_to_check, expected)
+
+
+@router.post("/clay/enrichment", response_model=ClayWebhookResponse)
+async def clay_enrichment_webhook(request: Request) -> ClayWebhookResponse:
+    """
+    Receive enrichment results from Clay.com's provider waterfall.
+
+    PHONES ARE GOLD! Clay fills gaps when Apollo can't find phones.
+    Phone priority: Apollo > Harvester > Clay (tertiary fallback).
+
+    This endpoint:
+    1. Validates the webhook signature (HMAC-SHA256)
+    2. Parses phones, emails, firmographics from Clay payload
+    3. Stores enrichment in clay_enrichment_results table
+    4. Returns acknowledgement (Clay expects fast response)
+
+    Returns:
+        ClayWebhookResponse with status and data counts
+    """
+    body = await request.body()
+    signature = request.headers.get("x-clay-signature")
+
+    if not verify_clay_signature(body, signature):
+        logger.warning("Invalid Clay webhook signature")
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+    try:
+        raw_payload = await request.json()
+    except Exception as e:
+        logger.error(f"Failed to parse Clay webhook payload: {e}")
+        raise HTTPException(status_code=400, detail="Invalid payload format") from e
+
+    lead_id = raw_payload.get("lead_id")
+    if not lead_id:
+        raise HTTPException(status_code=400, detail="Missing lead_id in payload")
+
+    # Parse enrichment data
+    from app.services.enrichment.clay import ClayClient
+
+    enrichment = ClayClient.parse_enrichment_result(raw_payload)
+
+    phones_count = len(enrichment.phones)
+    emails_count = len(enrichment.emails)
+
+    if phones_count > 0:
+        phone_types = [p.get("type", "unknown") for p in enrichment.phones]
+        logger.info(
+            f"PHONES ARE GOLD! Clay delivered {phones_count} phones for lead {lead_id}: {phone_types}"
+        )
+
+    # Store to database
+    try:
+        from app.services.database.supabase_client import supabase_client
+
+        supabase_client.store_clay_enrichment(
+            lead_id=lead_id,
+            data={
+                "phones": enrichment.phones,
+                "emails": enrichment.emails,
+                "company_name": enrichment.company_name,
+                "industry": enrichment.industry,
+                "employee_count": enrichment.employee_count,
+                "revenue_range": enrichment.revenue_range,
+                "technologies": enrichment.technologies,
+                "linkedin_url": enrichment.linkedin_url,
+                "funding_info": enrichment.funding_info,
+                "raw_payload": raw_payload,
+            },
+        )
+    except Exception:
+        logger.exception(f"Failed to store Clay enrichment for lead {lead_id}")
+        # Still return 200 — don't make Clay retry on our DB failures
+
+    return ClayWebhookResponse(
+        status="processed",
+        phones_received=phones_count,
+        emails_received=emails_count,
+        lead_id=lead_id,
     )

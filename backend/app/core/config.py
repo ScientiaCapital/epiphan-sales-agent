@@ -115,6 +115,20 @@ class Settings(BaseSettings):
         description="HMAC-SHA256 secret for validating Lead Harvester webhook signatures"
     )
 
+    # Clay.com Enrichment (Fallback - 75+ provider waterfall)
+    clay_table_webhook_url: str = Field(
+        default="",
+        description="Clay table webhook URL for pushing leads to enrich"
+    )
+    clay_webhook_secret: str = Field(
+        default="",
+        description="HMAC-SHA256 secret for validating Clay callback signatures"
+    )
+    clay_enabled: bool = Field(
+        default=False,
+        description="Feature flag: enable Clay as fallback enrichment source"
+    )
+
     # Monitoring
     langchain_tracing_v2: bool = False
     langchain_api_key: str = Field(default="")

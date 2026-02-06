@@ -200,6 +200,31 @@ async def _process_harvester_batch(
                         atl_confidence = atl_match.confidence
                         atl_reason = atl_match.reason
 
+                # Clay fallback: push to Clay if no phone found
+                # PHONES ARE GOLD! Clay's 75+ providers may find what Apollo missed
+                if not phone_data.get("best_phone"):
+                    try:
+                        from app.services.enrichment.clay import clay_client
+
+                        if clay_client.is_enabled():
+                            await clay_client.push_lead_to_clay({
+                                "lead_id": external_id,
+                                "email": email,
+                                "name": lead_data.get("contact_name"),
+                                "company": lead_data.get("company_name"),
+                                "title": title,
+                            })
+                            logger.info(
+                                "Pushed lead %s to Clay for phone enrichment (Apollo found no phone)",
+                                external_id,
+                            )
+                    except Exception:
+                        logger.warning(
+                            "Clay push failed for lead %s",
+                            external_id,
+                            exc_info=True,
+                        )
+
                 # Build result
                 result.update({
                     "success": True,

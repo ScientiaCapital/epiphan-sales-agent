@@ -74,6 +74,7 @@ backend/
 │   └── services/
 │       ├── enrichment/      # Data enrichment clients
 │       │   ├── apollo.py    # Apollo.io API (primary enrichment)
+│       │   ├── clay.py      # Clay.com fallback (75+ provider waterfall)
 │       │   ├── audit.py     # Enrichment audit logging & HubSpot mapping
 │       │   ├── pipeline.py  # Background processing pipeline
 │       │   └── scraper.py   # Web scraping
@@ -92,7 +93,7 @@ backend/
 │       └── integrations/
 │           └── hubspot/     # HubSpot CRM client
 ├── tests/
-│   ├── unit/                # Unit tests (1097+)
+│   ├── unit/                # Unit tests (1206+)
 │   └── integration/         # Integration tests
 └── pyproject.toml
 ```
@@ -151,6 +152,7 @@ Five AI agents + Call Brief Assembler powered by LangGraph + Claude/Cerebras:
 ### Webhooks
 - `POST /api/webhooks/apollo/phone-reveal` - Apollo async phone delivery
 - `POST /api/webhooks/harvester/lead-push` - Real-time Harvester sync
+- `POST /api/webhooks/clay/enrichment` - Clay fallback enrichment (75+ providers)
 - `GET /api/webhooks/phones/pending` - Pending phone approvals
 - `POST /api/webhooks/phones/approve` - Approve HubSpot sync
 
@@ -264,6 +266,48 @@ API Request → Immediate: employer phone only
 **Key Function**: `is_atl_decision_maker(title, seniority) -> ATLMatch`
 
 **Rate Limiting**: Exponential backoff (1s → 32s max, 3 retries)
+
+---
+
+## Recent Work (2026-02-06) - Clay.com Enrichment Integration
+**Branch**: `main`
+
+Clay as fallback enrichment source (75+ provider waterfall). Webhook-based: POST lead → Clay enriches → Clay POSTs back. Feature-flagged (`CLAY_ENABLED=false`). Phone priority: Apollo > Harvester > Clay.
+
+### New Files
+- `app/services/enrichment/clay.py` — ClayClient, ClayEnrichmentData, phone type mapping, singleton
+- `migrations/006_add_clay_enrichment.sql` — clay_enrichment_results table + indexes
+- `tests/unit/test_clay_client.py` (18 tests) — Client, parsing, feature flag, singleton
+- `tests/unit/test_clay_webhook.py` (10 tests) — Endpoint, HMAC, payload handling
+- `tests/unit/test_clay_supabase.py` (6 tests) — CRUD methods
+- `tests/unit/test_clay_phone_merging.py` (6 tests) — Priority, dedup, backward compat
+- `tests/unit/test_clay_pipeline.py` (4 tests) — Fallback trigger, feature flag, graceful degradation
+- `tests/unit/test_clay_audit.py` (5 tests) — Audit entries, summary
+
+### Modified Files
+- `app/core/config.py` — 3 new settings: `clay_table_webhook_url`, `clay_webhook_secret`, `clay_enabled`
+- `app/api/routes/webhooks.py` — `POST /api/webhooks/clay/enrichment` + HMAC verification
+- `app/services/database/supabase_client.py` — 4 Clay CRUD methods (store, get, get_unsynced, mark_synced)
+- `app/services/langgraph/tools/harvester_mapper.py` — `clay_phones` param in `enrich_phone_numbers()`
+- `app/services/enrichment/pipeline.py` — Clay fallback trigger when Apollo finds no phone
+- `app/services/enrichment/audit.py` — `EnrichmentType.CLAY` + `log_clay_enrichment()`
+- `backend/.env.example` — Clay env vars section
+
+### Key Features
+- **Webhook-based**: No REST API — mirrors proven Apollo webhook pattern
+- **Feature-flagged**: `CLAY_ENABLED=false` by default, zero risk to existing flow
+- **Phone priority**: Apollo (primary) > Harvester (secondary) > Clay (tertiary fallback)
+- **Graceful degradation**: Clay failures never block enrichment pipeline
+- **HMAC verification**: Same `hmac.compare_digest()` pattern as Apollo/Harvester
+- **Supabase upsert**: `on_conflict="lead_id"` for idempotent webhook handling
+
+### Deployment Checklist
+- [ ] Run migration: `psql -f migrations/006_add_clay_enrichment.sql`
+- [ ] Set `CLAY_TABLE_WEBHOOK_URL` (from Clay UI)
+- [ ] Set `CLAY_WEBHOOK_SECRET` for signature verification
+- [ ] Set `CLAY_ENABLED=true` to activate
+
+**Code Quality**: 1206 tests passed, 5 skipped, 0 mypy errors, 0 ruff errors (49 new tests)
 
 ---
 
