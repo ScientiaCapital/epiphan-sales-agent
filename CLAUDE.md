@@ -92,7 +92,7 @@ backend/
 │       └── integrations/
 │           └── hubspot/     # HubSpot CRM client
 ├── tests/
-│   ├── unit/                # Unit tests (1083+)
+│   ├── unit/                # Unit tests (1097+)
 │   └── integration/         # Integration tests
 └── pyproject.toml
 ```
@@ -173,6 +173,7 @@ Five AI agents + Call Brief Assembler powered by LangGraph + Claude/Cerebras:
 - `GET /api/call-outcomes/stats/range` - Date range stats (?start=&end=)
 - `GET /api/call-outcomes/follow-ups` - Pending follow-ups (?date=&include_overdue=true)
 - `GET /api/call-outcomes/lead/{lead_id}` - Full call history for a lead
+- `GET /api/call-outcomes/brief-effectiveness` - Brief quality → meeting conversion rates
 - `POST /api/call-outcomes/{outcome_id}/hubspot-sync` - Manual HubSpot sync
 
 ### Lead Management
@@ -294,6 +295,32 @@ JWT API authentication, Docker deployment, doc hygiene.
 - **Docker**: Multi-stage build (python:3.12-slim), non-root user, healthcheck, 4 uvicorn workers
 
 **Code Quality**: 1083 tests passed, 5 skipped, 0 mypy errors, 0 ruff errors (19 new tests)
+
+---
+
+## Recent Work (2026-02-06) - Call Brief ↔ Outcome Linkage
+**Branch**: `main`
+
+Closes the feedback loop: persisted call briefs linked to outcomes so agents can learn which scripts/briefs lead to meetings.
+
+### New Files
+- `migrations/005_add_call_briefs.sql` — call_briefs table + call_brief_id FK on call_outcomes
+- `tests/unit/test_call_brief_linkage.py` (19 tests) — Schema, service, API, analytics tests
+
+### Modified Files
+- `app/services/langgraph/agents/call_brief.py` — Added `brief_id: str | None` to CallBriefResponse
+- `app/api/routes/call_brief.py` — Added `save_call_brief()` persistence + brief_id assignment
+- `app/data/call_outcome_schemas.py` — Added `call_brief_id: str | None` to CallOutcomeCreate + CallOutcomeResponse
+- `app/services/call_outcomes/service.py` — Added `call_brief_id` to record insert + `get_brief_effectiveness()` analytics method
+- `app/api/routes/call_outcomes.py` — Added `GET /api/call-outcomes/brief-effectiveness` endpoint
+- `app/services/database/supabase_client.py` — Added save_call_brief, get_call_brief, get_briefs_with_outcomes methods
+
+### Key Features
+- **Brief Persistence**: `POST /api/agents/call-brief` now auto-saves to DB and returns `brief_id` (graceful degradation on failure)
+- **Outcome Linkage**: `POST /api/call-outcomes` accepts optional `call_brief_id` to link outcome to its prep brief
+- **Effectiveness Analytics**: `GET /api/call-outcomes/brief-effectiveness` — conversion rates by quality level, objection prediction accuracy
+
+**Code Quality**: 1102 tests passed, 5 skipped, 0 mypy errors, 0 ruff errors (19 new tests)
 
 ---
 

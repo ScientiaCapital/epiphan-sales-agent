@@ -161,6 +161,16 @@ async def get_pending_follow_ups(
     )
 
 
+@router.get("/brief-effectiveness")
+async def get_brief_effectiveness() -> dict[str, Any]:
+    """Analyze call brief effectiveness — which brief qualities lead to meetings.
+
+    Returns conversion rates by brief quality level, objection prediction
+    accuracy, and average brief quality for meetings booked.
+    """
+    return call_outcome_service.get_brief_effectiveness()
+
+
 @router.get("/lead/{lead_id}", response_model=LeadCallHistory)
 async def get_lead_call_history(lead_id: str) -> LeadCallHistory:
     """Get full call history for a specific lead."""

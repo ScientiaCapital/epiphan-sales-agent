@@ -79,6 +79,13 @@ psql $DATABASE_URL -f backend/migrations/003_add_webhook_phone_data.sql
 psql $DATABASE_URL -f backend/migrations/004_add_call_outcomes.sql
 ```
 
+### Migration 5: Call Briefs Storage
+```bash
+# Creates: call_briefs table, adds call_brief_id to call_outcomes
+# Purpose: Persist call briefs for feedback loop with outcomes
+psql $DATABASE_URL -f backend/migrations/005_add_call_briefs.sql
+```
+
 **For Supabase:** Run each SQL file in the SQL Editor (Dashboard → SQL Editor → New Query)
 
 ---

@@ -30,6 +30,24 @@ router = APIRouter(prefix="/api/agents", tags=["agents"], dependencies=[Depends(
 _assembler = CallBriefAssembler()
 
 
+def save_call_brief(brief: CallBriefResponse, lead_id: str) -> str | None:
+    """Persist a call brief to the database. Returns the brief_id or None on failure."""
+    try:
+        from app.services.database.supabase_client import supabase_client
+
+        record = supabase_client.save_call_brief({
+            "lead_id": lead_id,
+            "brief_json": brief.model_dump(mode="json"),
+            "brief_quality": brief.brief_quality.value,
+            "trigger": brief.trigger,
+            "call_type": brief.call_type,
+        })
+        return str(record["id"]) if record and "id" in record else None
+    except Exception:
+        logger.warning("Failed to persist call brief", exc_info=True)
+        return None
+
+
 class CallBriefAPIRequest(BaseModel):
     """API request for call brief generation."""
 
@@ -84,6 +102,11 @@ async def generate_call_brief(
     )
 
     brief = await _assembler.assemble(brief_request)
+
+    # Persist the brief for feedback loop (graceful degradation — don't fail the request)
+    brief_id = save_call_brief(brief, lead_id=request.lead.hubspot_id or request.lead.email)
+    if brief_id:
+        brief.brief_id = brief_id
 
     elapsed_ms = (time.monotonic() - start_time) * 1000
 

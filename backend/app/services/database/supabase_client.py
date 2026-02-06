@@ -529,6 +529,58 @@ class SupabaseClient:
         )
         return result.data[0] if result.data else {}
 
+    # -------------------------------------------------------------------------
+    # Call Briefs
+    # -------------------------------------------------------------------------
+
+    def save_call_brief(self, brief_data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Insert a call brief record.
+
+        Args:
+            brief_data: Call brief fields (lead_id, brief_json, brief_quality, etc.)
+
+        Returns:
+            Inserted record with generated UUID
+        """
+        result = self.client.table("call_briefs").insert(brief_data).execute()
+        return cast(dict[str, Any], result.data[0]) if result.data else {}
+
+    def get_call_brief(self, brief_id: str) -> dict[str, Any] | None:
+        """
+        Retrieve a call brief by ID.
+
+        Args:
+            brief_id: Call brief UUID
+
+        Returns:
+            Brief record or None
+        """
+        result = (
+            self.client.table("call_briefs")
+            .select("*")
+            .eq("id", brief_id)
+            .execute()
+        )
+        return cast(dict[str, Any], result.data[0]) if result.data else None
+
+    def get_briefs_with_outcomes(self) -> list[dict[str, Any]]:
+        """
+        Get call briefs joined with their outcomes for effectiveness analysis.
+
+        Returns a list of briefs that have linked outcomes, including
+        the outcome disposition and result for conversion tracking.
+
+        Returns:
+            List of brief records with outcome data
+        """
+        result = (
+            self.client.table("call_briefs")
+            .select("*, call_outcomes(id, disposition, result, objections)")
+            .execute()
+        )
+        return cast(list[dict[str, Any]], result.data) if result.data else []
+
 
 @lru_cache
 def get_supabase_client() -> SupabaseClient:

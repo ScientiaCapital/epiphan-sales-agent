@@ -192,6 +192,9 @@ class CallBriefResponse(BaseModel):
     script, objections, discovery questions, competitors, and reference story.
     """
 
+    # Persistence
+    brief_id: str | None = Field(default=None, description="UUID from call_briefs table")
+
     # Core sections
     contact: ContactInfo
     company: CompanySnapshot

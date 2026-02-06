@@ -70,6 +70,7 @@ class CallOutcomeCreate(BaseModel):
     follow_up_date: date | None = None
     follow_up_type: FollowUpType | None = None
     follow_up_notes: str | None = None
+    call_brief_id: str | None = None
 
 
 class CallOutcomeBatchCreate(BaseModel):
@@ -101,6 +102,7 @@ class CallOutcomeResponse(BaseModel):
     follow_up_date: date | None = None
     follow_up_type: str | None = None
     follow_up_notes: str | None = None
+    call_brief_id: str | None = None
     hubspot_engagement_id: str | None = None
     synced_to_hubspot: bool = False
     synced_at: datetime | None = None

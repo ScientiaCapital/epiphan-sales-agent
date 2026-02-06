@@ -109,6 +109,7 @@ class CallOutcomeService:
             "objections": outcome.objections,
             "buying_signals": outcome.buying_signals,
             "competitor_mentioned": outcome.competitor_mentioned,
+            "call_brief_id": outcome.call_brief_id,
         }
 
         if follow_up_date is not None:
@@ -330,6 +331,90 @@ class CallOutcomeService:
         supabase_client.mark_outcome_synced(outcome_id, engagement_id)
 
         return {"synced": True, "hubspot_engagement_id": engagement_id}
+
+    def get_brief_effectiveness(self) -> dict[str, Any]:
+        """
+        Analyze call brief effectiveness — which brief qualities lead to meetings.
+
+        Returns:
+            Dict with conversion rates by quality, objection prediction accuracy,
+            and average brief quality for meetings.
+        """
+        briefs_with_outcomes = supabase_client.get_briefs_with_outcomes()
+
+        # Initialize counters
+        quality_stats: dict[str, dict[str, int]] = {
+            "HIGH": {"total": 0, "meetings": 0},
+            "MEDIUM": {"total": 0, "meetings": 0},
+            "LOW": {"total": 0, "meetings": 0},
+        }
+        total_briefs = 0
+        total_linked = 0
+        objection_matches = 0
+        objection_comparisons = 0
+        meeting_qualities: list[str] = []
+
+        for brief in briefs_with_outcomes:
+            total_briefs += 1
+            quality = (brief.get("brief_quality") or "medium").upper()
+            if quality not in quality_stats:
+                quality = "MEDIUM"
+
+            outcomes = brief.get("call_outcomes", [])
+            if not outcomes:
+                continue
+
+            for outcome in outcomes:
+                total_linked += 1
+                quality_stats[quality]["total"] += 1
+
+                if outcome.get("result") == "meeting_booked":
+                    quality_stats[quality]["meetings"] += 1
+                    meeting_qualities.append(quality)
+
+                # Check objection prediction accuracy
+                brief_json = brief.get("brief_json", {})
+                predicted = brief_json.get("objection_prep", {}).get("objections", [])
+                actual = outcome.get("objections") or []
+                if predicted and actual:
+                    objection_comparisons += 1
+                    predicted_texts = {
+                        o.get("objection", "").lower()
+                        for o in predicted
+                        if isinstance(o, dict)
+                    }
+                    actual_lower = {o.lower() for o in actual}
+                    if predicted_texts & actual_lower:
+                        objection_matches += 1
+
+        # Calculate rates
+        conversion_by_quality = {}
+        for q, stats in quality_stats.items():
+            total = stats["total"]
+            meetings = stats["meetings"]
+            conversion_by_quality[q] = {
+                "total": total,
+                "meetings": meetings,
+                "rate": round(meetings / total, 2) if total > 0 else 0.0,
+            }
+
+        objection_accuracy = (
+            round(objection_matches / objection_comparisons, 2)
+            if objection_comparisons > 0
+            else 0.0
+        )
+
+        avg_quality = max(
+            set(meeting_qualities), key=meeting_qualities.count
+        ) if meeting_qualities else "N/A"
+
+        return {
+            "total_briefs_used": total_briefs,
+            "total_outcomes_linked": total_linked,
+            "conversion_by_quality": conversion_by_quality,
+            "objection_prediction_accuracy": objection_accuracy,
+            "avg_brief_quality_for_meetings": avg_quality,
+        }
 
     # =========================================================================
     # Private helpers
