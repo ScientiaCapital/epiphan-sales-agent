@@ -7,18 +7,19 @@ full agent pipeline: Research → Script Selection → Email Generation.
 import asyncio
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.data.lead_schemas import Lead
+from app.middleware.auth import require_auth
 from app.services.langgraph.agents import (
     EmailPersonalizationAgent,
     LeadResearchAgent,
     ScriptSelectionAgent,
 )
 
-router = APIRouter(prefix="/api/batch", tags=["batch"])
+router = APIRouter(prefix="/api/batch", tags=["batch"], dependencies=[Depends(require_auth)])
 
 # Singleton agent instances
 lead_research_agent = LeadResearchAgent()

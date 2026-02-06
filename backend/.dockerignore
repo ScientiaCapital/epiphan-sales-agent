@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# Testing
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Git
+.git/
+.gitignore
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Docs (not needed in container)
+docs/
+*.md
+
+# Build artifacts
+dist/
+build/

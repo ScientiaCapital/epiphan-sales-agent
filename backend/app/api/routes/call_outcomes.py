@@ -13,7 +13,7 @@ import logging
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.data.call_outcome_schemas import (
     CallOutcomeBatchCreate,
@@ -23,12 +23,13 @@ from app.data.call_outcome_schemas import (
     LeadCallHistory,
     PendingFollowUpsResponse,
 )
+from app.middleware.auth import require_auth
 from app.services.call_outcomes.service import call_outcome_service
 from app.services.database.supabase_client import supabase_client
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/call-outcomes", tags=["call-outcomes"])
+router = APIRouter(prefix="/api/call-outcomes", tags=["call-outcomes"], dependencies=[Depends(require_auth)])
 
 
 @router.post("", response_model=CallOutcomeLogResult)

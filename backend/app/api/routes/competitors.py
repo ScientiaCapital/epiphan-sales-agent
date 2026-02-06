@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from app.core.cache import with_cache_headers
@@ -13,8 +13,9 @@ from app.data.competitors import (
     get_competitors_by_vertical,
 )
 from app.data.schemas import CompetitorBattlecard, Vertical
+from app.middleware.auth import require_auth
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_auth)])
 
 # Type aliases for query parameters
 VerticalFilter = Annotated[

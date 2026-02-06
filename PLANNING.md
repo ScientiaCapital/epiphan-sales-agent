@@ -90,14 +90,6 @@
 - In-memory batch tracking (MVP)
 - Integration with monitoring endpoints
 
-### 5. Call Outcome Tracking (Pure Data Layer)
-- Separate `call_outcomes` table (NOT extending `outreach_events` — different concern)
-- VARCHAR for disposition/result (not PG enums) — matches existing project pattern
-- Default follow-up rules applied automatically when Tim doesn't specify one
-- Lead status auto-updated on meeting_booked, qualified_out, dead
-- Business day calculation for follow-up dates (skips weekends)
-- No AI/LLM calls — pure data tracking + auto-scheduling
-
 ### 4. Call Brief Assembler (NOT a LangGraph agent)
 - Composition layer using raw `asyncio.gather()` for parallel agent execution
 - Avoids MasterOrchestrator overhead (no review gates, checkpointing, HubSpot sync)
@@ -105,3 +97,11 @@
 - Enriches with playbook data: objections, discovery questions, competitor battlecards, reference stories
 - Phone extraction from 3 sources: research result, lead record, webhook table
 - Brief quality scoring: HIGH (8+), MEDIUM (4-7), LOW (<4) based on data completeness
+
+### 5. Call Outcome Tracking (Pure Data Layer)
+- Separate `call_outcomes` table (NOT extending `outreach_events` — different concern)
+- VARCHAR for disposition/result (not PG enums) — matches existing project pattern
+- Default follow-up rules applied automatically when Tim doesn't specify one
+- Lead status auto-updated on meeting_booked, qualified_out, dead
+- Business day calculation for follow-up dates (skips weekends)
+- No AI/LLM calls — pure data tracking + auto-scheduling

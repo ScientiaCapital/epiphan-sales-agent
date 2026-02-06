@@ -12,13 +12,14 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from app.middleware.auth import require_auth
 from app.services.enrichment.audit import BatchAuditSummary, RateLimitStatus
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/monitoring", tags=["monitoring"])
+router = APIRouter(prefix="/api/monitoring", tags=["monitoring"], dependencies=[Depends(require_auth)])
 
 
 # =============================================================================

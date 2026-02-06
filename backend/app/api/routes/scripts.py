@@ -2,14 +2,15 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from app.core.cache import with_cache_headers
 from app.data.schemas import ColdCallScript, PersonaType, TriggerType, Vertical, WarmCallScript
 from app.data.scripts import get_script_by_vertical, get_warm_script_for_call
+from app.middleware.auth import require_auth
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_auth)])
 
 # Type aliases for query parameters with metadata
 TriggerTypeParam = Annotated[

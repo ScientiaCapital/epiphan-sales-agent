@@ -208,6 +208,26 @@ def setup_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql://test:test@localhost/test_db")
 
 
+@pytest.fixture(autouse=True)
+def _bypass_jwt_auth() -> Generator[None, None, None]:
+    """Bypass JWT auth for all tests.
+
+    Routes now require JWT via Depends(require_auth). This fixture
+    uses FastAPI's dependency_overrides to return a dummy user so
+    existing tests don't need modification. Tests that explicitly
+    test auth behavior (test_auth_middleware.py) use their own setup.
+    """
+    from app.main import app
+    from app.middleware.auth import require_auth
+
+    async def _fake_require_auth() -> dict[str, str]:
+        return {"sub": "test-user", "role": "bdr"}
+
+    app.dependency_overrides[require_auth] = _fake_require_auth
+    yield
+    app.dependency_overrides.pop(require_auth, None)
+
+
 # =============================================================================
 # Cleanup Utilities
 # =============================================================================

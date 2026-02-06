@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.agents import router as agents_router
+from app.api.routes.auth import router as auth_router
 from app.api.routes.batch import router as batch_router
 from app.api.routes.call_brief import router as call_brief_router
 from app.api.routes.call_outcomes import router as call_outcomes_router
@@ -70,6 +71,7 @@ async def health() -> dict[str, str]:
 
 
 # Include routers
+app.include_router(auth_router)  # Already has /api/auth prefix - Token issuance (public)
 app.include_router(scripts_router, prefix="/api/scripts", tags=["scripts"])
 app.include_router(personas_router, prefix="/api/personas", tags=["personas"])
 app.include_router(competitors_router, prefix="/api/competitors", tags=["competitors"])

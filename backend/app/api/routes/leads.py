@@ -16,12 +16,13 @@ import logging
 from datetime import datetime, timezone
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.data.lead_schemas import (
     Lead,
 )
+from app.middleware.auth import require_auth
 from app.services.database.supabase_client import supabase_client
 from app.services.enrichment.apollo import TieredEnrichmentResult, apollo_client
 from app.services.hubspot.sync import hubspot_sync_service
@@ -38,7 +39,7 @@ from app.services.scoring.lead_scorer import lead_scorer
 # Configure logger for audit trails
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/leads", tags=["leads"])
+router = APIRouter(prefix="/leads", tags=["leads"], dependencies=[Depends(require_auth)])
 
 # Singleton agent instance for ingest endpoint
 _qualification_agent = QualificationAgent()

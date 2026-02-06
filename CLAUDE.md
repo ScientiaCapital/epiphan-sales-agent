@@ -54,7 +54,10 @@ cd backend && uv run uvicorn app.main:app --reload --port 8001
 backend/
 ├── app/
 │   ├── main.py              # FastAPI app entry
+│   ├── middleware/
+│   │   └── auth.py          # JWT authentication (require_auth dependency)
 │   ├── api/routes/
+│   │   ├── auth.py          # Token issuance endpoint
 │   │   ├── agents.py        # LangGraph agent endpoints
 │   │   ├── batch.py         # Batch processing endpoint
 │   │   ├── call_outcomes.py  # BDR call outcome tracking
@@ -89,7 +92,7 @@ backend/
 │       └── integrations/
 │           └── hubspot/     # HubSpot CRM client
 ├── tests/
-│   ├── unit/                # Unit tests (1017+)
+│   ├── unit/                # Unit tests (1083+)
 │   └── integration/         # Integration tests
 └── pyproject.toml
 ```
@@ -132,6 +135,12 @@ Five AI agents + Call Brief Assembler powered by LangGraph + Claude/Cerebras:
 **Tier Thresholds**: Tier 1 (70+), Tier 2 (50-69), Tier 3 (30-49), Not ICP (<30)
 
 ## API Endpoints
+
+### Authentication (public)
+- `POST /api/auth/token` - Issue JWT (API key → bearer token exchange)
+
+**All endpoints below require `Authorization: Bearer <token>` header.**
+**Exceptions: `/health`, `/`, `/docs`, webhooks (use HMAC signature auth).**
 
 ### Monitoring & Observability
 - `GET /api/monitoring/credits` - Track Apollo credit usage and savings
@@ -257,7 +266,38 @@ API Request → Immediate: employer phone only
 
 ---
 
-## Recent Work (2026-02-05) - Call Outcome Tracking
+## Recent Work (2026-02-06) - Production Hardening
+**Branch**: `main`
+
+JWT API authentication, Docker deployment, doc hygiene.
+
+### New Files
+- `app/middleware/__init__.py` — Middleware package
+- `app/middleware/auth.py` — JWT middleware: create_access_token, get_current_user, require_auth
+- `app/api/routes/auth.py` — Token endpoint: POST /api/auth/token
+- `backend/Dockerfile` — Multi-stage production build with uv
+- `backend/.dockerignore` — Docker build exclusions
+- `tests/unit/test_auth_middleware.py` (19 tests) — Token creation, validation, expiry, integration
+
+### Modified Files
+- `app/main.py` — Registered auth_router
+- `app/api/routes/{agents,batch,call_brief,call_outcomes,competitors,leads,monitoring,personas,scripts}.py` — Added `dependencies=[Depends(require_auth)]`
+- `tests/conftest.py` — Added `_bypass_jwt_auth` fixture (dependency_overrides)
+- `docker-compose.yml` — Added api service
+- `backend/pyproject.toml` — Added fastapi, uvicorn, pydantic-settings deps
+- `PLANNING.md` — Fixed section numbering
+- `docs/deployment/PRODUCTION_CHECKLIST.md` — Added migration 004, Docker deploy instructions
+
+### Key Features
+- **JWT Auth**: Bearer token required on all non-public endpoints. 15-min token expiry (configurable). Constant-time API key comparison.
+- **Public Routes**: /health, /, /docs, /api/auth/token, webhooks (HMAC auth)
+- **Docker**: Multi-stage build (python:3.12-slim), non-root user, healthcheck, 4 uvicorn workers
+
+**Code Quality**: 1083 tests passed, 5 skipped, 0 mypy errors, 0 ruff errors (19 new tests)
+
+---
+
+## Previous Work (2026-02-05) - Call Outcome Tracking
 **Branch**: `main`
 
 Closes the feedback loop: log call outcomes, auto-update lead state, auto-schedule follow-ups, track daily stats.

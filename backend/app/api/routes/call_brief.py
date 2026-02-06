@@ -10,10 +10,11 @@ import logging
 import time
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from app.data.lead_schemas import Lead
+from app.middleware.auth import require_auth
 from app.services.langgraph.agents.call_brief import (
     CallBriefAssembler,
     CallBriefRequest,
@@ -23,7 +24,7 @@ from app.services.langgraph.tracing import trace_agent
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/agents", tags=["agents"])
+router = APIRouter(prefix="/api/agents", tags=["agents"], dependencies=[Depends(require_auth)])
 
 # Singleton assembler instance
 _assembler = CallBriefAssembler()

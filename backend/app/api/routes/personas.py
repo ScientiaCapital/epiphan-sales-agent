@@ -2,14 +2,15 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from app.core.cache import with_cache_headers
 from app.data.personas import PERSONAS, get_persona_by_id, get_personas_by_vertical
 from app.data.schemas import PersonaProfile, Vertical
+from app.middleware.auth import require_auth
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_auth)])
 
 # Type alias for optional vertical filter
 VerticalFilter = Annotated[

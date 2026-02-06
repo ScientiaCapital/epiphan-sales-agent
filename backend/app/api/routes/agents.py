@@ -15,11 +15,12 @@ import json
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.data.lead_schemas import Lead
+from app.middleware.auth import require_auth
 from app.services.langgraph.agents import (
     CompetitorIntelAgent,
     EmailPersonalizationAgent,
@@ -30,7 +31,7 @@ from app.services.langgraph.agents import (
 from app.services.langgraph.checkpointing import get_checkpointer
 from app.services.langgraph.states import QualificationTier, ResearchBrief
 
-router = APIRouter(prefix="/api/agents", tags=["agents"])
+router = APIRouter(prefix="/api/agents", tags=["agents"], dependencies=[Depends(require_auth)])
 
 # Singleton agent instances
 lead_research_agent = LeadResearchAgent()

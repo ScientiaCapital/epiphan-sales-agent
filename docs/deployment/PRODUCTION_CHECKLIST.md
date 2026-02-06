@@ -72,6 +72,13 @@ psql $DATABASE_URL -f backend/migrations/002_add_semantic_store.sql
 psql $DATABASE_URL -f backend/migrations/003_add_webhook_phone_data.sql
 ```
 
+### Migration 4: Call Outcomes
+```bash
+# Creates: call_outcomes table with 5 indexes
+# Purpose: BDR call outcome tracking, auto follow-ups, daily stats
+psql $DATABASE_URL -f backend/migrations/004_add_call_outcomes.sql
+```
+
 **For Supabase:** Run each SQL file in the SQL Editor (Dashboard → SQL Editor → New Query)
 
 ---
@@ -79,13 +86,29 @@ psql $DATABASE_URL -f backend/migrations/003_add_webhook_phone_data.sql
 ## Deployment Steps
 
 ### 1. Deploy Application
-```bash
-# Example for Docker/Railway/Fly.io
-docker build -t epiphan-sales-agent ./backend
-docker push your-registry/epiphan-sales-agent:latest
 
-# Or for uvicorn direct:
-cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port 8001
+**Option A: Docker Compose (recommended)**
+```bash
+# Build and start all services (postgres, redis, api)
+docker compose up -d --build
+
+# View logs
+docker compose logs -f api
+
+# Stop
+docker compose down
+```
+
+**Option B: Docker standalone**
+```bash
+cd backend
+docker build -t epiphan-sales-agent .
+docker run -p 8001:8001 --env-file .env epiphan-sales-agent
+```
+
+**Option C: Direct uvicorn**
+```bash
+cd backend && uv run uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4
 ```
 
 ### 2. Configure Webhook Endpoints
