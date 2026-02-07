@@ -67,6 +67,13 @@ class MasterOrchestratorAgent:
         self._email_agent = email_personalization_agent
         self._memory = semantic_memory
 
+        # Memory management modules (wired for future message history support)
+        from app.services.langgraph.memory.summarizer import ConversationSummarizer
+        from app.services.langgraph.memory.trimmer import MessageTrimmer
+
+        self._trimmer = MessageTrimmer(max_messages=20, max_tokens=8000)
+        self._summarizer = ConversationSummarizer()
+
     def _build_graph(self) -> StateGraph[OrchestratorState]:
         """Build the LangGraph state graph with parallel nodes."""
         graph: StateGraph[OrchestratorState] = StateGraph(
@@ -815,6 +822,22 @@ class MasterOrchestratorAgent:
     # =========================================================================
     # Helper Functions
     # =========================================================================
+
+    async def _trim_if_needed(
+        self, messages: list[Any]
+    ) -> list[Any]:
+        """Trim message list if it exceeds configured limits.
+
+        Currently a passthrough — OrchestratorState doesn't track messages yet.
+        When message history is added to the state, this will activate trimming.
+        """
+        from langchain_core.messages import BaseMessage
+
+        # Only trim if we actually have BaseMessage instances
+        if not messages or not all(isinstance(m, BaseMessage) for m in messages):
+            return messages
+        result = await self._trimmer.trim(messages)
+        return result.messages
 
     def _extract_tier(
         self, qualification_result: dict[str, Any] | None

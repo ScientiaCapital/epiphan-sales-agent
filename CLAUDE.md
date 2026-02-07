@@ -280,6 +280,25 @@ API Request → Immediate: employer phone only
 
 ---
 
+## Recent Work (2026-02-07) - Tech Debt Sprint: Wire Memory Modules
+**Branch**: `main`
+
+Wired 3 orphaned memory modules (UserMemoryStore 414 LOC, ConversationSummarizer 374 LOC, MessageTrimmer ~270 LOC) into production consumers. Previously only SemanticMemory was wired.
+
+### Wired Modules
+- **UserMemoryStore → CallSessionManager**: Prior interaction context in start_session(), interaction + objection recording in end_session()
+- **UserMemoryStore → CallBriefAssembler**: 4th parallel call for user context, enriches brief with prior interaction data
+- **MessageTrimmer + ConversationSummarizer → MasterOrchestrator**: Instantiated and wired as utilities, ready for message history activation
+
+### New Test Files
+- `tests/unit/test_user_memory_store.py` — UserMemoryStore unit tests
+- `tests/unit/test_conversation_summarizer.py` — ConversationSummarizer unit tests
+- `tests/unit/test_call_session_memory.py` — CallSession memory integration tests
+
+**Code Quality**: 1309 tests passed, 5 skipped, 0 mypy errors, 0 ruff errors (51 new tests)
+
+---
+
 ## Recent Work (2026-02-06) - Voice AI Call Session Integration
 **Branch**: `main`
 
@@ -357,11 +376,11 @@ Two fixes from previous session handoff notes.
 ---
 
 ## Build History (condensed)
-- **1258 tests**, 0 mypy errors, 0 ruff errors as of 2026-02-07
+- **1309 tests**, 0 mypy errors, 0 ruff errors as of 2026-02-07
 - All work on `main` branch. Key milestones:
   - Jan 27-28: Core agents (research, scripts, competitors, email, qualification)
   - Jan 29: Apollo tiered enrichment, Harvester sync, observability
   - Jan 31: mypy strict mode compliance (174 errors → 0)
   - Feb 5: LangGraph polish (middleware, streaming, memory, tracing), call briefs, outcomes
   - Feb 6: Brief analytics, Clay integration, JWT auth, Docker, Voice AI call sessions
-  - Feb 7: Security fix (phone endpoint auth), tier score aggregation bug fix
+  - Feb 7: Security fix (phone endpoint auth), tier score aggregation bug fix, tech debt sprint (wire memory modules)

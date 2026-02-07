@@ -81,6 +81,16 @@ class CallSessionManager:
             "qualification": brief_dict.get("qualification", {}),
         }
 
+        # Fetch prior interaction context (lazy import, graceful degradation)
+        user_context = await self._safe_get_user_context(lead_id)
+        if user_context and user_context.interaction_count > 0:
+            session.lead_context["prior_interactions"] = {
+                "interaction_count": user_context.interaction_count,
+                "last_interaction": user_context.last_interaction.isoformat() if user_context.last_interaction else None,
+                "objections_seen": user_context.objections_seen,
+                "account_notes": user_context.account_notes,
+            }
+
         self._sessions[session_id] = session
 
         logger.info(
@@ -224,6 +234,15 @@ class CallSessionManager:
             competitor_mentioned=competitor_mentioned,
         )
 
+        # Record interaction in user memory
+        notes_summary = notes or f"{disposition} - {result}"
+        await self._safe_record_interaction(session.lead_id, "call", notes_summary, result)
+
+        # Record any objections raised during the call
+        if session.objections_raised:
+            for objection_text in session.objections_raised:
+                await self._safe_add_objection(session.lead_id, objection_text)
+
         # Clean up session
         del self._sessions[session_id]
 
@@ -240,6 +259,36 @@ class CallSessionManager:
         )
 
         return outcome_result
+
+    async def _safe_get_user_context(self, lead_id: str) -> Any:
+        """Fetch user context from memory store. Never fails."""
+        try:
+            from app.services.langgraph.memory.user_store import user_memory
+
+            return await user_memory.get_user_context(lead_id)
+        except Exception:
+            logger.debug("User memory context fetch failed for %s", lead_id)
+            return None
+
+    async def _safe_record_interaction(
+        self, lead_id: str, interaction_type: str, summary: str, outcome: str
+    ) -> None:
+        """Record interaction in user memory. Never fails."""
+        try:
+            from app.services.langgraph.memory.user_store import user_memory
+
+            await user_memory.record_interaction(lead_id, interaction_type, summary, outcome)
+        except Exception:
+            logger.debug("User memory record failed for %s", lead_id)
+
+    async def _safe_add_objection(self, lead_id: str, objection: str) -> None:
+        """Record objection in user memory. Never fails."""
+        try:
+            from app.services.langgraph.memory.user_store import user_memory
+
+            await user_memory.add_objection(lead_id, objection)
+        except Exception:
+            logger.debug("User memory objection record failed for %s", lead_id)
 
     def _match_persona_objection(
         self,

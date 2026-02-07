@@ -151,3 +151,10 @@
 - 15-minute token expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
 - Constant-time API key comparison (timing-safe)
 - Public routes: /health, /, /docs, /api/auth/token, webhooks (HMAC auth)
+
+### 10. Memory Module Wiring Pattern
+- Three memory modules (UserMemoryStore, ConversationSummarizer, MessageTrimmer) wired into existing consumers
+- UserMemoryStore injected into CallSessionManager and CallBriefAssembler via constructor — enables prior interaction context
+- MessageTrimmer + ConversationSummarizer instantiated in MasterOrchestrator as utilities — ready for message history activation
+- All wiring uses optional dependencies with graceful degradation: if memory fails, the consumer continues without it
+- Module-level singletons remain the pattern (consistent with existing agent singletons)

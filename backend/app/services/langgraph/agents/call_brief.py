@@ -240,8 +240,8 @@ class CallBriefAssembler:
         start_time = time.monotonic()
         lead = request.lead
 
-        # Run all 3 agents in parallel
-        research_result, qualification_result, script_result = await self._run_agents(
+        # Run all agents in parallel (research, qualify, script, user context)
+        research_result, qualification_result, script_result, user_context = await self._run_agents(
             lead=lead,
             trigger=request.trigger,
             call_type=request.call_type,
@@ -270,6 +270,26 @@ class CallBriefAssembler:
             contact, company, qualification, script
         )
 
+        # Enrich with user memory context if available
+        if user_context:
+            intelligence_gaps.append(
+                f"Prior calls: {user_context['interaction_count']} previous interactions"
+            )
+            # Add prior objections to objection prep context
+            prior_objections = user_context.get("objections_seen", [])
+            if prior_objections:
+                for obj_text in prior_objections:
+                    if obj_text and not any(
+                        o.objection == obj_text for o in objection_prep.objections
+                    ):
+                        objection_prep.objections.append(
+                            ObjectionPrepItem(
+                                objection=obj_text,
+                                response="Previously raised — review prior approach",
+                                persona_context="from_user_memory",
+                            )
+                        )
+
         elapsed_ms = (time.monotonic() - start_time) * 1000
 
         return CallBriefResponse(
@@ -294,8 +314,8 @@ class CallBriefAssembler:
         trigger: str | None,
         call_type: str,
         research_depth: str,
-    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None]:
-        """Run research, qualification, and script agents in parallel.
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None]:
+        """Run research, qualification, script agents, and user context in parallel.
 
         Each agent failure is isolated — returns None for that result,
         allowing the brief to degrade gracefully.
@@ -335,12 +355,30 @@ class CallBriefAssembler:
                 logger.exception("Script agent failed for %s", lead.email)
                 return None
 
+        async def _safe_user_context() -> dict[str, Any] | None:
+            try:
+                from app.services.langgraph.memory.user_store import user_memory
+
+                ctx = await user_memory.get_user_context(lead.hubspot_id or lead.email)
+                if ctx and ctx.interaction_count > 0:
+                    return {
+                        "interaction_count": ctx.interaction_count,
+                        "last_interaction": ctx.last_interaction.isoformat() if ctx.last_interaction else None,
+                        "objections_seen": ctx.objections_seen,
+                        "account_notes": ctx.account_notes,
+                    }
+                return None
+            except Exception:
+                logger.exception("User memory failed for %s", lead.email)
+                return None
+
         results: tuple[dict[str, Any] | None, ...] = await asyncio.gather(
             _safe_research(),
             _safe_qualify(),
             _safe_script(),
+            _safe_user_context(),
         )
-        return results[0], results[1], results[2]
+        return results[0], results[1], results[2], results[3]
 
     def _get_persona_id(
         self,

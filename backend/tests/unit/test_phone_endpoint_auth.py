@@ -53,7 +53,7 @@ class TestPhoneEndpointAuth:
     ) -> None:
         """GET /api/webhooks/phones/pending with auth bypass should return 200."""
         # Uses the conftest's autouse _bypass_jwt_auth fixture
-        mock_db.get_unsynced_phones = lambda _limit=100: []  # type: ignore[union-attr]
+        mock_db.get_unsynced_phones = lambda **_kwargs: []  # type: ignore[union-attr]
         client = TestClient(app)
         response = client.get("/api/webhooks/phones/pending")
         assert response.status_code == 200
