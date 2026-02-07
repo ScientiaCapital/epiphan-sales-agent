@@ -318,6 +318,25 @@ Server → Client: {"type": "call_brief|competitor_response|objection_response|c
 
 ---
 
+## Recent Work (2026-02-07) - Security Fix + Bug Fix
+**Branch**: `main`
+
+Two fixes from previous session handoff notes.
+
+### Modified Files
+- `app/api/routes/webhooks.py` — Added `Depends(require_auth)` to `/phones/pending` and `/phones/approve` endpoints
+- `app/services/call_outcomes/service.py` — Fixed tier score aggregation: scores now counted per-brief, not per-outcome
+- `tests/unit/test_brief_effectiveness_scoring.py` — Added regression test for tier score bug
+- `tests/unit/test_phone_endpoint_auth.py` (NEW, 4 tests) — Auth enforcement tests for phone endpoints
+
+### Key Fixes
+- **Security: Phone endpoint auth** — `/phones/pending` and `/phones/approve` were BDR-facing data endpoints on the webhook router (which intentionally has NO router-level auth because webhooks use HMAC). Added per-endpoint `dependencies=[Depends(require_auth)]`.
+- **Bug: Tier score duplication** — `tier_scores` was appended inside `for outcome in outcomes` loop. A brief with 3 outcomes contributed the same score 3x, inflating `avg_score`. Moved extraction before the outcome loop.
+
+**Code Quality**: 1258 tests passed, 5 skipped, 0 mypy errors, 0 ruff errors (5 new tests)
+
+---
+
 ## Recent Work (2026-02-06) - Clay.com Enrichment Integration
 **Branch**: `main`
 

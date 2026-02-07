@@ -13,10 +13,11 @@ import hmac
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app.core.config import settings
+from app.middleware.auth import require_auth
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
@@ -303,7 +304,7 @@ class SyncApprovalResponse(BaseModel):
     results: list[SyncResult]
 
 
-@router.get("/phones/pending", response_model=PendingPhonesResponse)
+@router.get("/phones/pending", response_model=PendingPhonesResponse, dependencies=[Depends(require_auth)])
 async def get_pending_phones() -> PendingPhonesResponse:
     """
     Get phone records pending HubSpot sync approval.
@@ -345,7 +346,7 @@ async def get_pending_phones() -> PendingPhonesResponse:
         return PendingPhonesResponse(pending_count=0, phones=[])
 
 
-@router.post("/phones/approve", response_model=SyncApprovalResponse)
+@router.post("/phones/approve", response_model=SyncApprovalResponse, dependencies=[Depends(require_auth)])
 async def approve_hubspot_sync(request: SyncApprovalRequest) -> SyncApprovalResponse:
     """
     Approve and sync selected phone records to HubSpot.

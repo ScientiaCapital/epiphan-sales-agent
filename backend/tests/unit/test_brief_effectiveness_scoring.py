@@ -773,3 +773,53 @@ class TestEdgeCases:
         data = detail.model_dump()
         assert data["persona_id"] == "av_director"
         assert data["top_objections"][0] == {"budget": 5}
+
+    @patch("app.services.call_outcomes.service.supabase_client")
+    def test_tier_score_counted_once_per_brief_not_per_outcome(
+        self, mock_db: MagicMock, service: CallOutcomeService
+    ) -> None:
+        """Tier avg_score should count each brief's score once, not once per outcome.
+
+        Regression test: a brief with score=85 and 3 outcomes should contribute
+        one score entry (85), not three (85, 85, 85). This matters when briefs
+        have different outcome counts — the average would skew toward
+        briefs with more outcomes.
+        """
+        # Brief A: score 85, 3 outcomes
+        brief_a: dict[str, Any] = {
+            "id": "b-1",
+            "brief_quality": "HIGH",
+            "brief_json": {
+                "qualification": {"tier": "tier_1", "score": 85},
+                "contact": {},
+            },
+            "call_outcomes": [
+                {"disposition": "connected", "result": "meeting_booked"},
+                {"disposition": "connected", "result": "follow_up_needed"},
+                {"disposition": "connected", "result": "no_interest"},
+            ],
+        }
+        # Brief B: score 65, 1 outcome
+        brief_b: dict[str, Any] = {
+            "id": "b-2",
+            "brief_quality": "MEDIUM",
+            "brief_json": {
+                "qualification": {"tier": "tier_1", "score": 65},
+                "contact": {},
+            },
+            "call_outcomes": [
+                {"disposition": "voicemail", "result": "no_contact"},
+            ],
+        }
+        mock_db.get_briefs_with_outcomes.return_value = [brief_a, brief_b]
+        result = service.get_brief_effectiveness()
+
+        # Find tier_1 analytics
+        tier_1 = next(
+            (t for t in result.tier_analytics if t.tier == "tier_1"), None
+        )
+        assert tier_1 is not None
+
+        # Correct: avg of [85, 65] = 75.0 (one score per brief)
+        # Bug would give: avg of [85, 85, 85, 65] = 80.0 (scores duplicated per outcome)
+        assert tier_1.avg_score == 75.0

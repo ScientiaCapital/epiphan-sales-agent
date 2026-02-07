@@ -1,27 +1,20 @@
 # epiphan-sales-agent
 
-**Branch**: main | **Updated**: 2026-02-06
+**Branch**: main | **Updated**: 2026-02-07
 
 ## Status
-Production-ready AI sales assistant with 5 LangGraph agents, Call Brief Assembler with persistence, Call Outcome Tracking with brief linkage, Brief Effectiveness Deep Analytics, Clay.com fallback enrichment, Voice AI Call Session integration (WebSocket + REST), Master Orchestrator with parallel execution and review gates, tiered Apollo enrichment, observability endpoints, LangSmith tracing, and real-time Harvester sync. JWT API authentication and Docker deployment. 1253 tests (1253 passed, 5 skipped), 0 mypy errors, 0 ruff lint errors.
+Production-ready AI sales assistant with 5 LangGraph agents, Call Brief Assembler with persistence, Call Outcome Tracking with brief linkage, Brief Effectiveness Deep Analytics, Clay.com fallback enrichment, Voice AI Call Session integration (WebSocket + REST), Master Orchestrator with parallel execution and review gates, tiered Apollo enrichment, observability endpoints, LangSmith tracing, and real-time Harvester sync. JWT API authentication and Docker deployment. 1258 tests (1258 passed, 5 skipped), 0 mypy errors, 0 ruff lint errors.
 
 ## Today's Focus
-Voice AI Call Session integration + Clay.com enrichment + deep analytics.
+Security fixes + bug fixes from previous session handoff.
 
 ## Done (This Session)
-- **Voice AI Call Session Integration (47 new tests)**:
-  - WebSocket endpoint: `GET /ws/call-session?token=xxx` — bidirectional JSON messaging during live calls
-  - REST fallback: 5 endpoints under `/api/call-session/*`
-  - CallSessionManager: in-memory session state, agent orchestration, fuzzy objection matching
-  - Pydantic schemas for WS message types (ClientMessage, ServerMessage, session state, REST models)
-  - Tests: 13 WebSocket + 12 REST + 22 manager = 47 tests
-- **Clay.com Webhook-Based Enrichment (49 new tests)**:
-  - Fallback phone source: Apollo > Harvester > Clay (75+ provider waterfall)
-  - Feature-flagged: `CLAY_ENABLED=false` by default
-  - HMAC-verified webhook: `POST /api/webhooks/clay/enrichment`
-- **Brief Effectiveness Deep Analytics (55 new tests)**:
-  - Per-persona deep dives, script matrix, tier analytics, phone type impact
-  - `GET /brief-effectiveness/persona/{id}` and `/brief-effectiveness/scripts`
+- **Security fix: Phone endpoint authentication (5 new tests)**:
+  - Added `Depends(require_auth)` to `/phones/pending` and `/phones/approve` — were accidentally unauthenticated on the HMAC-only webhook router
+  - 4 auth tests: 401 without token, 200 with token, webhook still unauthenticated
+- **Bug fix: Tier score aggregation**:
+  - Moved tier score extraction outside `for outcome in outcomes` loop — was duplicating scores for briefs with multiple outcomes
+  - 1 regression test: verifies avg_score = mean of per-brief scores, not inflated by outcome count
 - End-of-day lockdown: security sweep (CLEAN), quality gate (PASS), docs updated
 
 ## Recent Commits
@@ -47,8 +40,6 @@ Voice AI Call Session integration + Clay.com enrichment + deep analytics.
 - **Docker Deployment**: Multi-stage Dockerfile with uv, docker-compose with full stack
 
 ## Next Sprint Candidates
-- Fix unauthenticated phone endpoints (/phones/pending, /phones/approve) — add Depends(require_auth)
-- Fix tier score aggregation bug in service.py:403 (scores counted per-outcome not per-brief)
 - WebSocket session ownership hardening (user_id field for multi-user)
 - Frontend UI (monitoring dashboard, call brief viewer, phone approval)
 - Refresh token rotation

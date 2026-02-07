@@ -383,6 +383,12 @@ class CallOutcomeService:
             if not outcomes:
                 continue
 
+            # Tier score is per-brief, not per-outcome — append once outside outcome loop
+            if tier:
+                score = (brief_json.get("qualification") or {}).get("score")
+                if score is not None:
+                    tier_scores.setdefault(tier, []).append(float(score))
+
             for outcome in outcomes:
                 total_linked += 1
                 quality_stats[quality]["total"] += 1
@@ -398,12 +404,9 @@ class CallOutcomeService:
                     if persona_title:
                         persona_titles[persona_id] = persona_title
 
-                # Group by tier
+                # Group by tier (outcomes per tier — correctly in outcome loop)
                 if tier:
                     tier_outcomes.setdefault(tier, []).append(outcome)
-                    score = (brief_json.get("qualification") or {}).get("score")
-                    if score is not None:
-                        tier_scores.setdefault(tier, []).append(float(score))
 
                 # Check objection prediction accuracy
                 predicted = (brief_json.get("objection_prep") or {}).get("objections", [])
