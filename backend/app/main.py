@@ -18,6 +18,7 @@ from app.api.routes.leads import router as leads_router
 from app.api.routes.monitoring import router as monitoring_router
 from app.api.routes.personas import router as personas_router
 from app.api.routes.scripts import router as scripts_router
+from app.api.routes.university_accounts import router as university_accounts_router
 from app.api.routes.webhooks import router as webhooks_router
 from app.core.config import settings
 from app.core.rate_limit import setup_rate_limiting
@@ -86,3 +87,4 @@ app.include_router(call_outcomes_router)  # Already has /api/call-outcomes prefi
 app.include_router(monitoring_router)  # Already has /api/monitoring prefix - Track the gold spend!
 app.include_router(call_session_router)  # Already has /api/call-session prefix - Voice AI REST fallback
 app.include_router(call_session_ws_router)  # WebSocket: /ws/call-session - Voice AI live call support
+app.include_router(university_accounts_router)  # Already has /api/university-accounts prefix - Target account scoring

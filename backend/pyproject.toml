@@ -134,3 +134,8 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "app.services.llm.clients"
 ignore_errors = true
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+]

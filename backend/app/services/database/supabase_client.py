@@ -701,6 +701,228 @@ class SupabaseClient:
             .execute()
         )
 
+    # =================================================================
+    # University Account Operations (Target Account Building)
+    # =================================================================
+
+    def upsert_university_account(
+        self, account_data: dict[str, Any]
+    ) -> dict[str, Any]:
+        """
+        Insert or update a university account by name+state.
+
+        Args:
+            account_data: University account fields
+
+        Returns:
+            Upserted record
+        """
+        result = (
+            self.client.table("university_accounts")
+            .upsert(account_data, on_conflict="name,state")
+            .execute()
+        )
+        return cast(dict[str, Any], result.data[0]) if result.data else {}
+
+    def upsert_university_accounts_batch(
+        self, accounts: list[dict[str, Any]], batch_size: int = 100
+    ) -> int:
+        """
+        Batch upsert university accounts.
+
+        Args:
+            accounts: List of account data dicts
+            batch_size: Records per batch
+
+        Returns:
+            Total number of upserted records
+        """
+        total_upserted = 0
+        for i in range(0, len(accounts), batch_size):
+            batch = accounts[i : i + batch_size]
+            result = (
+                self.client.table("university_accounts")
+                .upsert(batch, on_conflict="name,state")
+                .execute()
+            )
+            total_upserted += len(result.data) if result.data else 0
+        return total_upserted
+
+    def get_university_account(self, account_id: str) -> dict[str, Any] | None:
+        """Get a university account by UUID."""
+        result = (
+            self.client.table("university_accounts")
+            .select("*")
+            .eq("id", account_id)
+            .execute()
+        )
+        if result.data:
+            return cast(dict[str, Any], result.data[0])
+        return None
+
+    def get_university_accounts_by_tier(
+        self,
+        tier: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """
+        Get university accounts by tier, ordered by score descending.
+
+        Args:
+            tier: Account tier (A, B, C, D)
+            limit: Max results
+            offset: Pagination offset
+
+        Returns:
+            List of account records
+        """
+        result = (
+            self.client.table("university_accounts")
+            .select("*")
+            .eq("account_tier", tier)
+            .order("total_score", desc=True)
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
+        return result.data or []
+
+    def get_university_accounts_filtered(
+        self,
+        tier: str | None = None,
+        state: str | None = None,
+        carnegie: str | None = None,
+        max_contacts: int | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """
+        Get university accounts with multiple filters.
+
+        Args:
+            tier: Filter by account tier
+            state: Filter by US state (2-letter code)
+            carnegie: Filter by Carnegie classification
+            max_contacts: Only accounts with <= this many contacts
+            limit: Max results
+            offset: Pagination offset
+
+        Returns:
+            List of account records ordered by score
+        """
+        query = self.client.table("university_accounts").select("*")
+
+        if tier:
+            query = query.eq("account_tier", tier)
+        if state:
+            query = query.eq("state", state)
+        if carnegie:
+            query = query.eq("carnegie_classification", carnegie)
+        if max_contacts is not None:
+            query = query.lte("contact_count", max_contacts)
+
+        result = (
+            query.order("total_score", desc=True)
+            .range(offset, offset + limit - 1)
+            .execute()
+        )
+        return result.data or []
+
+    def get_university_account_tier_counts(self) -> dict[str, int]:
+        """Get count of university accounts in each tier."""
+        tiers = ["A", "B", "C", "D"]
+        counts: dict[str, int] = {}
+        for tier in tiers:
+            result = (
+                self.client.table("university_accounts")
+                .select("id", count=CountMethod.exact)
+                .eq("account_tier", tier)
+                .execute()
+            )
+            counts[tier] = result.count or 0
+        return counts
+
+    def get_university_gap_accounts(
+        self, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """
+        Get A/B tier accounts with no contacts (gap analysis).
+
+        These are high-value accounts that need immediate research
+        to identify decision-makers.
+
+        Returns:
+            List of A/B accounts with contact_count = 0
+        """
+        result = (
+            self.client.table("university_accounts")
+            .select("*")
+            .in_("account_tier", ["A", "B"])
+            .eq("contact_count", 0)
+            .order("total_score", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data or []
+
+    def update_university_account_contacts(
+        self,
+        account_id: str,
+        contact_count: int,
+        decision_maker_count: int,
+    ) -> dict[str, Any]:
+        """
+        Update contact counts for a university account.
+
+        Called after enriching contacts for an account.
+
+        Args:
+            account_id: University account UUID
+            contact_count: Total contacts on file
+            decision_maker_count: ATL decision-makers found
+
+        Returns:
+            Updated record
+        """
+        from datetime import datetime, timezone
+
+        result = (
+            self.client.table("university_accounts")
+            .update({
+                "contact_count": contact_count,
+                "decision_maker_count": decision_maker_count,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            })
+            .eq("id", account_id)
+            .execute()
+        )
+        return result.data[0] if result.data else {}
+
+    def get_university_account_by_domain(
+        self, domain: str
+    ) -> dict[str, Any] | None:
+        """
+        Look up a university account by .edu domain.
+
+        Useful for matching inbound leads (by email domain) to accounts.
+
+        Args:
+            domain: .edu domain to look up
+
+        Returns:
+            Account record or None
+        """
+        result = (
+            self.client.table("university_accounts")
+            .select("*")
+            .eq("domain", domain)
+            .execute()
+        )
+        if result.data:
+            return cast(dict[str, Any], result.data[0])
+        return None
+
+
 @lru_cache
 def get_supabase_client() -> SupabaseClient:
     """Get cached Supabase client instance."""
