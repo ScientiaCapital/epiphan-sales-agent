@@ -1,57 +1,36 @@
 # Current Task Status
 
-## Session: 2026-02-06
+## Session: 2026-02-07
 
 ### Completed This Session
-1. **JWT API Authentication + Docker Deployment** ✅
-   - [x] JWT middleware: create_access_token, get_current_user, require_auth
-   - [x] `POST /api/auth/token` endpoint (API key → bearer token exchange)
-   - [x] Bearer token required on all non-public endpoints (15-min expiry)
-   - [x] Multi-stage Docker build (python:3.12-slim, non-root user, healthcheck)
-   - [x] 19 new tests (token creation, validation, expiry, integration)
+1. **Security Fix: Phone Endpoint Auth** ✅ (commit ffd68ff)
+   - [x] Added `Depends(require_auth)` to `/phones/pending` and `/phones/approve`
+   - [x] 4 new auth enforcement tests
 
-2. **Call Brief ↔ Outcome Linkage** ✅
-   - [x] Migration `005_add_call_briefs.sql` — call_briefs table + call_brief_id FK
-   - [x] Brief persistence: `POST /api/agents/call-brief` auto-saves to DB, returns `brief_id`
-   - [x] Outcome linkage: `POST /api/call-outcomes` accepts optional `call_brief_id`
-   - [x] Basic effectiveness: `GET /api/call-outcomes/brief-effectiveness`
-   - [x] 19 new tests (schema, service, API, analytics)
+2. **Bug Fix: Tier Score Aggregation** ✅ (commit ffd68ff)
+   - [x] Fixed tier_scores counted per-outcome instead of per-brief
+   - [x] 1 regression test
 
-3. **Brief Effectiveness Deep Analytics** ✅
-   - [x] 10 new Pydantic models (ConversionFunnel, PhoneTypeImpact, TierAnalytics, PersonaSummary, etc.)
-   - [x] Enhanced `GET /brief-effectiveness` — persona summaries, tier analytics, phone impact, overall funnel (backward compatible)
-   - [x] `GET /brief-effectiveness/persona/{persona_id}` — per-trigger conversion funnels, top objections/signals
-   - [x] `GET /brief-effectiveness/scripts` — persona x trigger matrix ranked by meeting rate
-   - [x] 6 private service helpers (_build_conversion_funnel, _compute_phone_type_impact, etc.)
-   - [x] Expanded Supabase query with optional persona_id filter
-   - [x] 55 new tests (11 test classes covering helpers, endpoints, edge cases)
+3. **Context Cleanup & Audit** ✅
+   - [x] Disconnected unused MCP integrations (Vercel, Notion, Clay) — saved ~33.5k tokens
+   - [x] Removed duplicate superpowers plugin — saved ~630 tokens
+   - [x] Removed 8 niche skills (trading, miro, blue-ocean, etc.) — saved ~550 tokens
+   - [x] Trimmed CLAUDE.md work logs (673→367 lines) — saved ~5k tokens
+   - [x] Fixed ruff ARG005 lint error in test_phone_endpoint_auth.py
+
+4. **Full Security Sweep** ✅
+   - [x] Secrets scan: 0 found
+   - [x] CVE check: 0 critical (all packages current)
+   - [x] API exposure audit: all endpoints properly secured
 
 ### Code Quality Status
 | Check | Status |
 |-------|--------|
-| Tests | 1157 passed, 5 skipped |
-| mypy | 0 errors |
+| Tests | 1258 passed, 5 skipped |
+| mypy | 0 errors (94 source files) |
 | Ruff lint | 0 errors |
 | Secrets | 0 found |
-
-### Current Test Counts
-- Total: 1162 tests (1157 passed, 5 skipped)
-
----
-
-## Backlog (Future Sessions)
-
-1. **Frontend Development** (Medium)
-   - [ ] Build monitoring dashboard UI
-   - [ ] Phone approval interface
-   - [ ] Call brief viewer + effectiveness dashboard
-
-2. **Memory Integration** (Low)
-   - [ ] Wire UserMemoryStore into orchestrator
-   - [ ] Wire ConversationSummarizer for long sessions
-
-3. **Full E2E Testing**
-   - [ ] Test Harvester → Pipeline → Qualification flow
+| Critical CVEs | 0 |
 
 ---
 
@@ -61,12 +40,7 @@
 3. `backend/migrations/003_add_webhook_phone_data.sql` - Apollo phone webhook storage
 4. `backend/migrations/004_add_call_outcomes.sql` - Call outcome tracking
 5. `backend/migrations/005_add_call_briefs.sql` - Call brief persistence + outcome linkage
+6. `backend/migrations/006_add_clay_enrichment.sql` - Clay enrichment results
 
 ## Required Environment Variables
 See `backend/.env.example` for complete list.
-
-Key env vars:
-- `JWT_SECRET_KEY` - Secret for JWT token signing
-- `API_KEY` - API key for token exchange
-- `LANGGRAPH_AES_KEY` - 32-byte base64 key for checkpoint encryption
-  Generate with: `openssl rand -base64 32`

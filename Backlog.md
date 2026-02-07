@@ -3,7 +3,7 @@
 ## Priority 1 - Production Deployment
 - [x] Add API authentication (JWT with bearer tokens) ✅ 2026-02-06
 - [ ] Set up production environment variables
-- [ ] Run SQL migrations (001, 002, 003, 004, 005)
+- [ ] Run SQL migrations (001, 002, 003, 004, 005, 006)
 - [ ] Configure public webhook URLs
 - [ ] Set up monitoring/alerting
 - [ ] Deploy Docker container to production
@@ -111,8 +111,28 @@
 - [x] Real-time Harvester sync
 - [x] Background processing pipeline
 
+### Clay.com Enrichment Integration (DONE - 2026-02-06)
+- [x] ClayClient with webhook-based enrichment (75+ provider waterfall)
+- [x] Feature-flagged (`CLAY_ENABLED=false`), HMAC verification
+- [x] Phone priority: Apollo > Harvester > Clay
+- [x] Migration `006_add_clay_enrichment.sql`
+- [x] 49 new tests
+
+### Voice AI Call Session (DONE - 2026-02-06)
+- [x] WebSocket (`/ws/call-session`) + REST fallback endpoints
+- [x] Real-time competitor battlecards + objection handling during calls
+- [x] Session lifecycle: brief → call support → outcome logging
+- [x] 47 new tests
+
+### Security Hardening (DONE - 2026-02-07)
+- [x] Phone endpoint auth fix (`/phones/pending`, `/phones/approve`)
+- [x] Tier score aggregation bug fix
+- [x] Context cleanup audit (MCP, skills, CLAUDE.md)
+- [x] Full security sweep: 0 secrets, 0 CVEs
+- [x] 5 new tests
+
 ### Testing (DONE)
-- [x] 1162 tests (1157 passed, 5 skipped)
+- [x] 1258 tests (1258 passed, 5 skipped)
 - [x] Comprehensive test coverage for all features
 
 ### Tech Debt Resolution (DONE)
