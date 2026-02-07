@@ -78,3 +78,8 @@ Thumbs.db
 *.key
 credentials.json
 service-account.json
+
+# Installers
+*.dmg
+*.exe
+*.msi

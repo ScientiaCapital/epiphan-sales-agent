@@ -61,6 +61,7 @@ backend/
 │   │   ├── agents.py        # LangGraph agent endpoints
 │   │   ├── batch.py         # Batch processing endpoint
 │   │   ├── call_outcomes.py  # BDR call outcome tracking
+│   │   ├── call_session.py  # Voice AI call session (WebSocket + REST)
 │   │   ├── monitoring.py    # Observability (credits, rate-limits, batches)
 │   │   ├── scripts.py       # Script endpoints
 │   │   ├── leads.py         # Lead scoring endpoints
@@ -68,6 +69,7 @@ backend/
 │   ├── data/
 │   │   ├── schemas.py       # Pydantic models
 │   │   ├── call_outcome_schemas.py  # Call outcome Pydantic models
+│   │   ├── call_session_schemas.py  # Voice AI session Pydantic models
 │   │   ├── scripts.py       # Script lookup functions
 │   │   ├── competitors.py   # Competitor battlecards
 │   │   └── persona_warm_scripts.py  # Persona-specific scripts
@@ -79,6 +81,7 @@ backend/
 │       │   ├── pipeline.py  # Background processing pipeline
 │       │   └── scraper.py   # Web scraping
 │       ├── call_outcomes/    # BDR call outcome tracking service
+│       ├── call_session/     # Voice AI call session management
 │       ├── scoring/         # Lead scoring services
 │       │   └── atl_detector.py  # ATL decision-maker detection (8 personas)
 │       ├── langgraph/       # AI Agents
@@ -178,6 +181,14 @@ Five AI agents + Call Brief Assembler powered by LangGraph + Claude/Cerebras:
 - `GET /api/call-outcomes/brief-effectiveness` - Brief quality → meeting conversion rates
 - `POST /api/call-outcomes/{outcome_id}/hubspot-sync` - Manual HubSpot sync
 
+### Voice AI Call Session
+- `GET /ws/call-session?token=xxx` - **WebSocket for live call support** (bidirectional JSON)
+- `POST /api/call-session/start` - REST: Start session + get call brief
+- `POST /api/call-session/{id}/competitor` - REST: Competitor query during call
+- `POST /api/call-session/{id}/objection` - REST: Objection response
+- `POST /api/call-session/{id}/end` - REST: End call + log outcome
+- `GET /api/call-session/{id}` - REST: Get session state
+
 ### Lead Management
 - `POST /api/batch/process` - Process multiple leads
 - `POST /api/batch/process/stream/tokens` - Single lead with token streaming (SSE)
@@ -266,6 +277,44 @@ API Request → Immediate: employer phone only
 **Key Function**: `is_atl_decision_maker(title, seniority) -> ATLMatch`
 
 **Rate Limiting**: Exponential backoff (1s → 32s max, 3 retries)
+
+---
+
+## Recent Work (2026-02-06) - Voice AI Call Session Integration
+**Branch**: `main`
+
+WebSocket + REST endpoints for live call support during Voice AI desktop app sessions. Manages session lifecycle: call brief generation, competitor battlecards, objection handling, and call outcome logging — all via a single connection.
+
+### New Files
+- `app/data/call_session_schemas.py` — Pydantic models for WS/REST message types (ClientMessage, ServerMessage, session state)
+- `app/services/call_session/__init__.py` — Package init
+- `app/services/call_session/manager.py` — CallSessionManager: in-memory session state, agent orchestration, fuzzy objection matching
+- `app/api/routes/call_session.py` — WebSocket endpoint (`/ws/call-session`) + REST fallback (`/api/call-session/*`)
+- `tests/unit/test_call_session_manager.py` (24 tests) — Session lifecycle, competitor/objection responses, outcome logging, fuzzy matching
+- `tests/unit/test_call_session_websocket.py` (12 tests) — WS connect/auth, message routing, error handling
+- `tests/unit/test_call_session_rest.py` (11 tests) — REST endpoint CRUD, session not found
+
+### Modified Files
+- `app/main.py` — Mounted `call_session_router` (REST) and `call_session_ws_router` (WebSocket)
+- `.gitignore` — Added `*.dmg`, `*.exe`, `*.msi` patterns
+- `PLANNING.md` — Added Voice AI endpoints, Clay webhook, architecture diagram updates
+- `CLAUDE.md` — Added call session endpoints and project structure entries
+
+### Key Features
+- **Dual interface**: WebSocket (real-time bidirectional) + REST (fallback) — same `CallSessionManager`, zero logic duplication
+- **JWT on WebSocket**: Token as query parameter (`?token=xxx`), validated on connect
+- **In-memory sessions**: Ephemeral during call; briefs + outcomes persisted to Supabase via existing code
+- **Agent reuse**: CallBriefAssembler, CompetitorIntelAgent, CallOutcomeService — no new AI logic
+- **Fuzzy objection matching**: `SequenceMatcher` with 0.4 threshold against persona profiles
+- **Graceful degradation**: All agent calls wrapped in try/except, returns partial data on failure
+
+### WebSocket Protocol
+```
+Client → Server: {"type": "start_call|competitor_query|objection|end_call", "data": {...}}
+Server → Client: {"type": "call_brief|competitor_response|objection_response|call_logged|error", "data": {...}}
+```
+
+**Code Quality**: 1253 tests passed, 5 skipped, 0 mypy errors, 0 ruff errors (47 new tests)
 
 ---
 

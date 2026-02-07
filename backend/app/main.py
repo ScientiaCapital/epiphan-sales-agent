@@ -11,6 +11,8 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.batch import router as batch_router
 from app.api.routes.call_brief import router as call_brief_router
 from app.api.routes.call_outcomes import router as call_outcomes_router
+from app.api.routes.call_session import router as call_session_router
+from app.api.routes.call_session import ws_router as call_session_ws_router
 from app.api.routes.competitors import router as competitors_router
 from app.api.routes.leads import router as leads_router
 from app.api.routes.monitoring import router as monitoring_router
@@ -82,3 +84,5 @@ app.include_router(batch_router)  # Already has /api/batch prefix
 app.include_router(webhooks_router)  # Already has /api/webhooks prefix - PHONES ARE GOLD!
 app.include_router(call_outcomes_router)  # Already has /api/call-outcomes prefix - Close the feedback loop
 app.include_router(monitoring_router)  # Already has /api/monitoring prefix - Track the gold spend!
+app.include_router(call_session_router)  # Already has /api/call-session prefix - Voice AI REST fallback
+app.include_router(call_session_ws_router)  # WebSocket: /ws/call-session - Voice AI live call support

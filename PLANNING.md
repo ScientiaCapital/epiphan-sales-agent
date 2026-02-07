@@ -12,7 +12,8 @@
 │                     FastAPI Backend                              │
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │ Routes: agents, batch, leads, monitoring, scripts,       │  │
-│  │   webhooks, personas, competitors, call-brief, outcomes  │  │
+│  │   webhooks, personas, competitors, call-brief, outcomes, │  │
+│  │   call-session (WS + REST)                               │  │
 │  └──────────────────────────────────────────────────────────┘  │
 │  ┌───────────────┐  ┌───────────────┐  ┌────────────────────┐  │
 │  │  LangGraph    │  │  Enrichment   │  │   Integrations     │  │
@@ -71,8 +72,17 @@
 - `GET /api/monitoring/batches/{id}` - Batch status
 - `POST /api/webhooks/apollo/phone-reveal` - Apollo phones
 - `POST /api/webhooks/harvester/lead-push` - Harvester sync
+- `POST /api/webhooks/clay/enrichment` - Clay fallback enrichment (75+ providers)
 - `GET /api/webhooks/phones/pending` - Pending approvals
 - `POST /api/webhooks/phones/approve` - Approve sync
+
+### Voice AI Call Session
+- `GET /ws/call-session?token=xxx` - WebSocket for live call support
+- `POST /api/call-session/start` - REST: Start session + get call brief
+- `POST /api/call-session/{id}/competitor` - REST: Competitor query during call
+- `POST /api/call-session/{id}/objection` - REST: Objection response
+- `POST /api/call-session/{id}/end` - REST: End call + log outcome
+- `GET /api/call-session/{id}` - REST: Get session state
 
 ### Scripts & Reference
 - `GET /api/scripts/warm/{trigger}` - Warm scripts
@@ -121,7 +131,22 @@
 - Python-side JSONB persona filtering (acceptable at ~20 calls/day scale)
 - Backward compatible with original brief-effectiveness response shape
 
-### 7. JWT API Authentication
+### 7. Clay.com Fallback Enrichment
+- Webhook-based (no REST API): POST lead → Clay enriches → Clay POSTs back
+- Feature-flagged: `CLAY_ENABLED=false` by default
+- Phone priority: Apollo (primary) > Harvester (secondary) > Clay (tertiary fallback)
+- HMAC-SHA256 verification, same pattern as Apollo/Harvester
+- Supabase upsert by lead_id for idempotent webhook handling
+
+### 8. Voice AI Call Session (WebSocket + REST)
+- WebSocket for real-time bidirectional communication during live calls
+- REST fallback endpoints using same `CallSessionManager` — zero logic duplication
+- In-memory sessions (Tim makes ~20 calls/day, 1 active at a time)
+- Session state is ephemeral; briefs + outcomes persisted to Supabase via existing code
+- JWT auth via query parameter for WebSocket (`?token=xxx`)
+- Reuses existing agents: CallBriefAssembler, CompetitorIntelAgent, CallOutcomeService
+
+### 9. JWT API Authentication
 - Bearer token required on all non-public endpoints
 - 15-minute token expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
 - Constant-time API key comparison (timing-safe)
