@@ -137,6 +137,7 @@ class CallSessionState(BaseModel):
     """
 
     session_id: str
+    user_id: str = Field(default="anonymous", description="JWT sub claim — session owner")
     lead_id: str
     lead_email: str | None = None
     lead_context: dict[str, Any] = Field(default_factory=dict, description="Cached lead data")

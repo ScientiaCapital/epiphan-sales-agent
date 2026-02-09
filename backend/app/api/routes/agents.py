@@ -9,16 +9,19 @@ Exposes agent functionality through REST endpoints:
 - /api/agents/emails/approve/{thread_id} - Approve/reject pending email
 - /api/agents/qualify - Lead qualification against ICP criteria
 - /api/agents/qualify/stream - Streaming qualification progress
+
+Rate limited at AGENT_RATE_LIMIT (10/min) because each call invokes LLM inference.
 """
 
 import json
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.core.rate_limit import AGENT_RATE_LIMIT, limiter
 from app.data.lead_schemas import Lead
 from app.middleware.auth import require_auth
 from app.services.langgraph.agents import (
@@ -124,7 +127,8 @@ class EmailResponse(BaseModel):
 
 # Endpoints
 @router.post("/research", response_model=ResearchResponse)
-async def research_lead(request: ResearchRequest) -> ResearchResponse:
+@limiter.limit(AGENT_RATE_LIMIT)
+async def research_lead(request: Request, body: ResearchRequest) -> ResearchResponse:
     """
     Research a lead and generate intelligence brief.
 
@@ -132,8 +136,8 @@ async def research_lead(request: ResearchRequest) -> ResearchResponse:
     then synthesizes into talking points and risk factors.
     """
     result = await lead_research_agent.run(
-        lead=request.lead,
-        research_depth=request.research_depth,
+        lead=body.lead,
+        research_depth=body.research_depth,
     )
 
     return ResearchResponse(
@@ -144,7 +148,8 @@ async def research_lead(request: ResearchRequest) -> ResearchResponse:
 
 
 @router.post("/scripts", response_model=ScriptResponse)
-async def select_script(request: ScriptRequest) -> ScriptResponse:
+@limiter.limit(AGENT_RATE_LIMIT)
+async def select_script(request: Request, body: ScriptRequest) -> ScriptResponse:
     """
     Select and personalize a call script for a lead.
 
@@ -152,10 +157,10 @@ async def select_script(request: ScriptRequest) -> ScriptResponse:
     and personalizes based on lead context.
     """
     result = await script_selection_agent.run(
-        lead=request.lead,
-        persona_match=request.persona_match,
-        trigger=request.trigger,
-        call_type=request.call_type,
+        lead=body.lead,
+        persona_match=body.persona_match,
+        trigger=body.trigger,
+        call_type=body.call_type,
     )
 
     return ScriptResponse(
@@ -166,7 +171,8 @@ async def select_script(request: ScriptRequest) -> ScriptResponse:
 
 
 @router.post("/competitors", response_model=CompetitorResponse)
-async def get_competitor_intel(request: CompetitorRequest) -> CompetitorResponse:
+@limiter.limit(AGENT_RATE_LIMIT)
+async def get_competitor_intel(request: Request, body: CompetitorRequest) -> CompetitorResponse:
     """
     Get competitor intelligence for a sales conversation.
 
@@ -174,9 +180,9 @@ async def get_competitor_intel(request: CompetitorRequest) -> CompetitorResponse
     and generates contextual response.
     """
     result = await competitor_intel_agent.run(
-        competitor_name=request.competitor_name,
-        context=request.context,
-        query_type=request.query_type,
+        competitor_name=body.competitor_name,
+        context=body.context,
+        query_type=body.query_type,
     )
 
     return CompetitorResponse(
@@ -187,7 +193,8 @@ async def get_competitor_intel(request: CompetitorRequest) -> CompetitorResponse
 
 
 @router.post("/emails", response_model=EmailResponse)
-async def personalize_email(request: EmailRequest) -> EmailResponse:
+@limiter.limit(AGENT_RATE_LIMIT)
+async def personalize_email(request: Request, body: EmailRequest) -> EmailResponse:
     """
     Generate a personalized sales email.
 
@@ -196,21 +203,21 @@ async def personalize_email(request: EmailRequest) -> EmailResponse:
     """
     # Convert dict to ResearchBrief if provided
     research_brief: ResearchBrief | None = None
-    if request.research_brief:
+    if body.research_brief:
         research_brief = {
-            "company_overview": request.research_brief.get("company_overview", ""),
-            "recent_news": request.research_brief.get("recent_news", []),
-            "talking_points": request.research_brief.get("talking_points", []),
-            "risk_factors": request.research_brief.get("risk_factors", []),
-            "linkedin_summary": request.research_brief.get("linkedin_summary"),
+            "company_overview": body.research_brief.get("company_overview", ""),
+            "recent_news": body.research_brief.get("recent_news", []),
+            "talking_points": body.research_brief.get("talking_points", []),
+            "risk_factors": body.research_brief.get("risk_factors", []),
+            "linkedin_summary": body.research_brief.get("linkedin_summary"),
         }
 
     result = await email_personalization_agent.run(
-        lead=request.lead,
+        lead=body.lead,
         research_brief=research_brief,
-        persona=request.persona,
-        email_type=request.email_type,
-        sequence_step=request.sequence_step,
+        persona=body.persona,
+        email_type=body.email_type,
+        sequence_step=body.sequence_step,
     )
 
     return EmailResponse(
@@ -278,7 +285,8 @@ class QualificationResponse(BaseModel):
 
 
 @router.post("/qualify", response_model=QualificationResponse)
-async def qualify_lead(request: QualificationRequest) -> QualificationResponse:
+@limiter.limit(AGENT_RATE_LIMIT)
+async def qualify_lead(request: Request, body: QualificationRequest) -> QualificationResponse:
     """
     Qualify a lead against ICP criteria.
 
@@ -292,9 +300,9 @@ async def qualify_lead(request: QualificationRequest) -> QualificationResponse:
     Returns qualification tier and recommended next action.
     """
     result = await qualification_agent.run(
-        lead=request.lead,
-        enrichment_data=request.enrichment_data,
-        skip_enrichment=request.skip_enrichment,
+        lead=body.lead,
+        enrichment_data=body.enrichment_data,
+        skip_enrichment=body.skip_enrichment,
     )
 
     # Convert score breakdown
@@ -338,7 +346,8 @@ async def qualify_lead(request: QualificationRequest) -> QualificationResponse:
 
 
 @router.post("/qualify/stream")
-async def qualify_lead_stream(request: QualificationRequest) -> StreamingResponse:
+@limiter.limit(AGENT_RATE_LIMIT)
+async def qualify_lead_stream(request: Request, body: QualificationRequest) -> StreamingResponse:
     """
     Qualify lead with streaming progress updates.
 
@@ -349,9 +358,9 @@ async def qualify_lead_stream(request: QualificationRequest) -> StreamingRespons
     """
     async def event_stream() -> AsyncGenerator[str, None]:
         async for event in qualification_agent.stream(
-            lead=request.lead,
-            enrichment_data=request.enrichment_data,
-            skip_enrichment=request.skip_enrichment,
+            lead=body.lead,
+            enrichment_data=body.enrichment_data,
+            skip_enrichment=body.skip_enrichment,
         ):
             # Format as SSE
             yield f"data: {json.dumps(event)}\n\n"
@@ -407,7 +416,8 @@ class EmailApprovalResponse(BaseModel):
 
 
 @router.post("/emails/with-approval", response_model=EmailApprovalPending)
-async def generate_email_with_approval(request: EmailRequest) -> EmailApprovalPending:
+@limiter.limit(AGENT_RATE_LIMIT)
+async def generate_email_with_approval(request: Request, body: EmailRequest) -> EmailApprovalPending:
     """
     Generate email and pause for human approval.
 
@@ -422,21 +432,21 @@ async def generate_email_with_approval(request: EmailRequest) -> EmailApprovalPe
     """
     # Convert dict to ResearchBrief if provided
     research_brief: ResearchBrief | None = None
-    if request.research_brief:
+    if body.research_brief:
         research_brief = {
-            "company_overview": request.research_brief.get("company_overview", ""),
-            "recent_news": request.research_brief.get("recent_news", []),
-            "talking_points": request.research_brief.get("talking_points", []),
-            "risk_factors": request.research_brief.get("risk_factors", []),
-            "linkedin_summary": request.research_brief.get("linkedin_summary"),
+            "company_overview": body.research_brief.get("company_overview", ""),
+            "recent_news": body.research_brief.get("recent_news", []),
+            "talking_points": body.research_brief.get("talking_points", []),
+            "risk_factors": body.research_brief.get("risk_factors", []),
+            "linkedin_summary": body.research_brief.get("linkedin_summary"),
         }
 
     result = await email_personalization_agent.run_with_approval(
-        lead=request.lead,
+        lead=body.lead,
         research_brief=research_brief,
-        persona=request.persona,
-        email_type=request.email_type,
-        sequence_step=request.sequence_step,
+        persona=body.persona,
+        email_type=body.email_type,
+        sequence_step=body.sequence_step,
     )
 
     return EmailApprovalPending(
@@ -450,7 +460,8 @@ async def generate_email_with_approval(request: EmailRequest) -> EmailApprovalPe
 
 
 @router.post("/emails/approve/{thread_id}", response_model=EmailApprovalResponse)
-async def approve_email(thread_id: str, approval: EmailApprovalInput) -> EmailApprovalResponse:
+@limiter.limit(AGENT_RATE_LIMIT)
+async def approve_email(request: Request, thread_id: str, approval: EmailApprovalInput) -> EmailApprovalResponse:
     """
     Approve or reject a pending email.
 
@@ -484,7 +495,8 @@ async def approve_email(thread_id: str, approval: EmailApprovalInput) -> EmailAp
 
 
 @router.post("/emails/stream")
-async def stream_email_generation(request: EmailRequest) -> StreamingResponse:
+@limiter.limit(AGENT_RATE_LIMIT)
+async def stream_email_generation(request: Request, body: EmailRequest) -> StreamingResponse:
     """
     Stream email generation with token-level granularity.
 
@@ -502,23 +514,23 @@ async def stream_email_generation(request: EmailRequest) -> StreamingResponse:
     """
     # Convert dict to ResearchBrief if provided
     research_brief: ResearchBrief | None = None
-    if request.research_brief:
+    if body.research_brief:
         research_brief = {
-            "company_overview": request.research_brief.get("company_overview", ""),
-            "recent_news": request.research_brief.get("recent_news", []),
-            "talking_points": request.research_brief.get("talking_points", []),
-            "risk_factors": request.research_brief.get("risk_factors", []),
-            "linkedin_summary": request.research_brief.get("linkedin_summary"),
+            "company_overview": body.research_brief.get("company_overview", ""),
+            "recent_news": body.research_brief.get("recent_news", []),
+            "talking_points": body.research_brief.get("talking_points", []),
+            "risk_factors": body.research_brief.get("risk_factors", []),
+            "linkedin_summary": body.research_brief.get("linkedin_summary"),
         }
 
     async def token_event_stream() -> AsyncGenerator[str, None]:
         try:
             async for event in email_personalization_agent.stream_tokens(
-                lead=request.lead,
+                lead=body.lead,
                 research_brief=research_brief,
-                persona=request.persona,
-                email_type=request.email_type,
-                sequence_step=request.sequence_step,
+                persona=body.persona,
+                email_type=body.email_type,
+                sequence_step=body.sequence_step,
             ):
                 yield f"data: {json.dumps(event)}\n\n"
 

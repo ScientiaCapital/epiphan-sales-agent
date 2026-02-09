@@ -92,6 +92,12 @@ ignore = [
     "E501",  # line too long (handled by formatter)
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"app/api/routes/*.py" = [
+    "ARG001",  # slowapi @limiter.limit() requires `request: Request` param by convention
+    "B008",    # FastAPI Depends() in argument defaults is the standard pattern
+]
+
 [tool.mypy]
 python_version = "3.10"
 strict = true

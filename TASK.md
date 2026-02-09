@@ -1,36 +1,32 @@
 # Current Task Status
 
-## Session: 2026-02-07
+## Session: 2026-02-09
 
-### Completed This Session
-1. **Security Fix: Phone Endpoint Auth** ✅ (commit ffd68ff)
-   - [x] Added `Depends(require_auth)` to `/phones/pending` and `/phones/approve`
-   - [x] 4 new auth enforcement tests
+### Focus
+Housekeeping + tech debt — WebSocket session ownership, per-user rate limiting, devil's advocate agent.
 
-2. **Bug Fix: Tier Score Aggregation** ✅ (commit ffd68ff)
-   - [x] Fixed tier_scores counted per-outcome instead of per-brief
-   - [x] 1 regression test
-
-3. **Context Cleanup & Audit** ✅
-   - [x] Disconnected unused MCP integrations (Vercel, Notion, Clay) — saved ~33.5k tokens
-   - [x] Removed duplicate superpowers plugin — saved ~630 tokens
-   - [x] Removed 8 niche skills (trading, miro, blue-ocean, etc.) — saved ~550 tokens
-   - [x] Trimmed CLAUDE.md work logs (673→367 lines) — saved ~5k tokens
-   - [x] Fixed ruff ARG005 lint error in test_phone_endpoint_auth.py
-
-4. **Full Security Sweep** ✅
-   - [x] Secrets scan: 0 found
-   - [x] CVE check: 0 critical (all packages current)
-   - [x] API exposure audit: all endpoints properly secured
+### In Progress
+1. **WebSocket Session Ownership Hardening** — Add user_id to sessions, enforce ownership checks
+2. **Rate Limiting Per User** — Switch from IP-based to user-based, apply decorators across routes
+3. **Devil's Advocate Agent** — First custom subagent for post-implementation review
 
 ### Code Quality Status
 | Check | Status |
 |-------|--------|
-| Tests | 1258 passed, 5 skipped |
+| Tests | 1314 passed, 5 skipped |
 | mypy | 0 errors (94 source files) |
 | Ruff lint | 0 errors |
 | Secrets | 0 found |
-| Critical CVEs | 0 |
+
+---
+
+## Completed (Previous Sessions)
+
+### 2026-02-07
+- Security: Phone endpoint auth enforcement (4 tests) — commit `ffd68ff`
+- Bug fix: Tier score aggregation (1 regression test) — commit `ffd68ff`
+- Tech debt: Wired 3 orphaned memory modules (51 tests) — commit `3105e27`
+- Doc cleanup: Trimmed CLAUDE.md, fixed ruff lint — commit `22bf5f5`
 
 ---
 

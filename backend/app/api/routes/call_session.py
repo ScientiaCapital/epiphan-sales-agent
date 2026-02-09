@@ -66,11 +66,12 @@ async def call_session_websocket(
     """
     # Validate JWT before accepting connection
     try:
-        await get_current_user(token)
+        user_claims = await get_current_user(token)
     except Exception:
         await websocket.close(code=4001, reason="Invalid or missing token")
         return
 
+    user_id: str = user_claims.get("sub", "anonymous")
     await websocket.accept()
 
     session_id: str | None = None
@@ -85,7 +86,7 @@ async def call_session_websocket(
                 await _send_error(websocket, "Invalid message format")
                 continue
 
-            response = await _handle_message(msg, session_id)
+            response = await _handle_message(msg, session_id, user_id=user_id)
 
             # Track session_id from start_call response
             if msg.type == ClientMessageType.START_CALL and "session_id" in response.get("data", {}):
@@ -107,27 +108,28 @@ async def call_session_websocket(
 async def _handle_message(
     msg: ClientMessage,
     session_id: str | None,
+    user_id: str = "anonymous",
 ) -> dict[str, Any]:
     """Route a client message to the appropriate handler."""
     if msg.type == ClientMessageType.START_CALL:
-        return await _handle_start_call(msg.data)
+        return await _handle_start_call(msg.data, user_id=user_id)
     elif msg.type == ClientMessageType.COMPETITOR_QUERY:
         if not session_id:
             return _error_response("No active session — send start_call first")
-        return await _handle_competitor_query(session_id, msg.data)
+        return await _handle_competitor_query(session_id, msg.data, user_id=user_id)
     elif msg.type == ClientMessageType.OBJECTION:
         if not session_id:
             return _error_response("No active session — send start_call first")
-        return await _handle_objection(session_id, msg.data)
+        return await _handle_objection(session_id, msg.data, user_id=user_id)
     elif msg.type == ClientMessageType.END_CALL:
         if not session_id:
             return _error_response("No active session — send start_call first")
-        return await _handle_end_call(session_id, msg.data)
+        return await _handle_end_call(session_id, msg.data, user_id=user_id)
     else:
         return _error_response(f"Unknown message type: {msg.type}")
 
 
-async def _handle_start_call(data: dict[str, Any]) -> dict[str, Any]:
+async def _handle_start_call(data: dict[str, Any], user_id: str = "anonymous") -> dict[str, Any]:
     """Handle start_call message — generate brief and create session."""
     try:
         parsed = StartCallData(**data)
@@ -137,6 +139,7 @@ async def _handle_start_call(data: dict[str, Any]) -> dict[str, Any]:
     session, brief_dict = await call_session_manager.start_session(
         lead_id=parsed.lead_id,
         lead_email=parsed.lead_email,
+        user_id=user_id,
     )
 
     response_data = brief_dict.copy()
@@ -148,8 +151,14 @@ async def _handle_start_call(data: dict[str, Any]) -> dict[str, Any]:
     ).model_dump(mode="json")
 
 
-async def _handle_competitor_query(session_id: str, data: dict[str, Any]) -> dict[str, Any]:
+async def _handle_competitor_query(
+    session_id: str, data: dict[str, Any], user_id: str = "anonymous",
+) -> dict[str, Any]:
     """Handle competitor_query message — return battlecard response."""
+    session = call_session_manager.get_session(session_id, user_id=user_id)
+    if not session:
+        return _error_response("Session not found")
+
     try:
         parsed = CompetitorQueryData(**data)
     except Exception:
@@ -174,8 +183,14 @@ async def _handle_competitor_query(session_id: str, data: dict[str, Any]) -> dic
     ).model_dump(mode="json")
 
 
-async def _handle_objection(session_id: str, data: dict[str, Any]) -> dict[str, Any]:
+async def _handle_objection(
+    session_id: str, data: dict[str, Any], user_id: str = "anonymous",
+) -> dict[str, Any]:
     """Handle objection message — return persona-matched response."""
+    session = call_session_manager.get_session(session_id, user_id=user_id)
+    if not session:
+        return _error_response("Session not found")
+
     try:
         parsed = ObjectionData(**data)
     except Exception:
@@ -199,8 +214,14 @@ async def _handle_objection(session_id: str, data: dict[str, Any]) -> dict[str, 
     ).model_dump(mode="json")
 
 
-async def _handle_end_call(session_id: str, data: dict[str, Any]) -> dict[str, Any]:
+async def _handle_end_call(
+    session_id: str, data: dict[str, Any], user_id: str = "anonymous",
+) -> dict[str, Any]:
     """Handle end_call message — log outcome and close session."""
+    session = call_session_manager.get_session(session_id, user_id=user_id)
+    if not session:
+        return _error_response("Session not found")
+
     try:
         parsed = EndCallData(**data)
     except Exception:
@@ -249,7 +270,10 @@ async def _send_error(websocket: WebSocket, message: str) -> None:
 
 
 @router.post("/start", response_model=StartSessionResponse)
-async def start_session(request: StartSessionRequest) -> StartSessionResponse:
+async def start_session(
+    request: StartSessionRequest,
+    user: dict[str, Any] = Depends(require_auth),
+) -> StartSessionResponse:
     """Start a call session and get the call brief.
 
     REST equivalent of the WebSocket start_call message.
@@ -258,6 +282,7 @@ async def start_session(request: StartSessionRequest) -> StartSessionResponse:
     session, brief_dict = await call_session_manager.start_session(
         lead_id=request.lead_id,
         lead_email=request.lead_email,
+        user_id=user.get("sub", "anonymous"),
     )
 
     return StartSessionResponse(
@@ -271,12 +296,13 @@ async def start_session(request: StartSessionRequest) -> StartSessionResponse:
 async def competitor_query(
     session_id: str,
     request: CompetitorQueryRequest,
+    user: dict[str, Any] = Depends(require_auth),
 ) -> dict[str, Any]:
     """Query competitor intelligence during a call.
 
     REST equivalent of the WebSocket competitor_query message.
     """
-    session = call_session_manager.get_session(session_id)
+    session = call_session_manager.get_session(session_id, user_id=user.get("sub"))
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -293,12 +319,13 @@ async def competitor_query(
 async def objection_query(
     session_id: str,
     request: ObjectionRequest,
+    user: dict[str, Any] = Depends(require_auth),
 ) -> dict[str, Any]:
     """Get objection handling response during a call.
 
     REST equivalent of the WebSocket objection message.
     """
-    session = call_session_manager.get_session(session_id)
+    session = call_session_manager.get_session(session_id, user_id=user.get("sub"))
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -314,12 +341,13 @@ async def objection_query(
 async def end_session(
     session_id: str,
     request: EndSessionRequest,
+    user: dict[str, Any] = Depends(require_auth),
 ) -> dict[str, Any]:
     """End a call session and log the outcome.
 
     REST equivalent of the WebSocket end_call message.
     """
-    session = call_session_manager.get_session(session_id)
+    session = call_session_manager.get_session(session_id, user_id=user.get("sub"))
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -337,9 +365,12 @@ async def end_session(
 
 
 @router.get("/{session_id}", response_model=SessionStateResponse)
-async def get_session(session_id: str) -> SessionStateResponse:
+async def get_session(
+    session_id: str,
+    user: dict[str, Any] = Depends(require_auth),
+) -> SessionStateResponse:
     """Get the current state of an active call session."""
-    session = call_session_manager.get_session(session_id)
+    session = call_session_manager.get_session(session_id, user_id=user.get("sub"))
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 

@@ -228,6 +228,20 @@ def _bypass_jwt_auth() -> Generator[None, None, None]:
     app.dependency_overrides.pop(require_auth, None)
 
 
+@pytest.fixture(autouse=True)
+def _disable_rate_limiting() -> Generator[None, None, None]:
+    """Disable slowapi rate limiting during tests.
+
+    Rate limiters use in-memory counters that persist across tests,
+    causing spurious 429s when many tests hit the same endpoint.
+    """
+    from app.core.rate_limit import limiter
+
+    limiter.enabled = False
+    yield
+    limiter.enabled = True
+
+
 # =============================================================================
 # Cleanup Utilities
 # =============================================================================

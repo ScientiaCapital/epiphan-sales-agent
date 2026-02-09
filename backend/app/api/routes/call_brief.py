@@ -10,9 +10,10 @@ import logging
 import time
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
+from app.core.rate_limit import AGENT_RATE_LIMIT, limiter
 from app.data.lead_schemas import Lead
 from app.middleware.auth import require_auth
 from app.services.langgraph.agents.call_brief import (
@@ -72,9 +73,11 @@ class CallBriefAPIResponse(BaseModel):
 
 
 @router.post("/call-brief", response_model=CallBriefAPIResponse)
+@limiter.limit(AGENT_RATE_LIMIT)
 @trace_agent("call_brief", metadata={"version": "1.0"})
 async def generate_call_brief(
-    request: CallBriefAPIRequest,
+    request: Request,
+    body: CallBriefAPIRequest,
 ) -> dict[str, Any]:
     """Generate a complete one-page call prep brief.
 
@@ -95,16 +98,16 @@ async def generate_call_brief(
     start_time = time.monotonic()
 
     brief_request = CallBriefRequest(
-        lead=request.lead,
-        trigger=request.trigger,
-        call_type=request.call_type,
-        research_depth=request.research_depth,
+        lead=body.lead,
+        trigger=body.trigger,
+        call_type=body.call_type,
+        research_depth=body.research_depth,
     )
 
     brief = await _assembler.assemble(brief_request)
 
     # Persist the brief for feedback loop (graceful degradation — don't fail the request)
-    brief_id = save_call_brief(brief, lead_id=request.lead.hubspot_id or request.lead.email)
+    brief_id = save_call_brief(brief, lead_id=body.lead.hubspot_id or body.lead.email)
     if brief_id:
         brief.brief_id = brief_id
 
@@ -113,7 +116,7 @@ async def generate_call_brief(
     logger.info(
         "Call brief generated",
         extra={
-            "lead_email": request.lead.email,
+            "lead_email": body.lead.email,
             "brief_quality": brief.brief_quality.value,
             "has_phone": brief.contact.phones.has_phone,
             "tier": brief.qualification.tier,

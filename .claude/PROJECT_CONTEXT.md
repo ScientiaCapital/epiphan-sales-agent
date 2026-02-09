@@ -1,29 +1,22 @@
 # epiphan-sales-agent
 
-**Branch**: main | **Updated**: 2026-02-07
+**Branch**: main | **Updated**: 2026-02-09
 
 ## Status
-Production-ready AI sales assistant with 5 LangGraph agents, Call Brief Assembler with persistence, Call Outcome Tracking with brief linkage, Brief Effectiveness Deep Analytics, Clay.com fallback enrichment, Voice AI Call Session integration (WebSocket + REST), Master Orchestrator with parallel execution and review gates, tiered Apollo enrichment, observability endpoints, LangSmith tracing, and real-time Harvester sync. JWT API authentication and Docker deployment. 1309 tests (1309 passed, 5 skipped), 0 mypy errors, 0 ruff lint errors.
+Production-ready AI sales assistant with 5 LangGraph agents, Call Brief Assembler with persistence, Call Outcome Tracking with brief linkage, Brief Effectiveness Deep Analytics, Clay.com fallback enrichment, Voice AI Call Session integration (WebSocket + REST), Master Orchestrator with parallel execution and review gates, tiered Apollo enrichment, observability endpoints, LangSmith tracing, and real-time Harvester sync. JWT API authentication and Docker deployment. 1314 tests (1314 passed, 5 skipped), 0 mypy errors, 0 ruff lint errors.
 
 ## Today's Focus
-Tech debt sprint — wire orphaned memory modules + doc cleanup.
+Housekeeping + tech debt — WebSocket session ownership hardening, per-user rate limiting, devil's advocate agent.
 
 ## Done (This Session)
-- **Tech Debt: Wire orphaned memory modules (51 new tests)**:
-  - UserMemoryStore → CallSessionManager: prior interaction context in start_session(), interaction + objection recording in end_session()
-  - UserMemoryStore → CallBriefAssembler: 4th parallel call for user context, enriches brief with prior call data
-  - MessageTrimmer + ConversationSummarizer → MasterOrchestrator: instantiated, ready for message history activation
-  - 3 new test files: test_user_memory_store (20), test_conversation_summarizer (18), test_call_session_memory (13)
-- **Doc cleanup**: Archived 17 completed sections to CHANGELOG.md, reset PROJECT_CONTEXT.md, deleted stale WORKTREE_TASK.md
-- **Bug fix**: test_phone_endpoint_auth lambda keyword arg mismatch
-- End-of-day lockdown: security sweep (CLEAN), quality gate (PASS), docs updated
+- (session just started)
 
 ## Recent Commits
+- `3105e27` feat: Wire orphaned memory modules into production consumers (51 tests)
 - `22bf5f5` chore: Trim project docs + fix ruff lint error
 - `ffd68ff` fix: Secure phone endpoints + fix tier score aggregation bug (5 tests)
 - `52820dc` feat: Add Voice AI call session integration — WebSocket + REST (47 tests)
 - `a4831f6` feat: Add Clay.com webhook-based enrichment (49 tests)
-- `2b8a5d1` feat: Add brief effectiveness deep analytics (55 tests)
 
 ## Key Features Implemented
 - **Voice AI Call Session**: WebSocket + REST endpoints for live call support — call briefs, competitor battlecards, objection handling, outcome logging
@@ -41,10 +34,9 @@ Tech debt sprint — wire orphaned memory modules + doc cleanup.
 - **Docker Deployment**: Multi-stage Dockerfile with uv, docker-compose with full stack
 
 ## Next Sprint Candidates
-- WebSocket session ownership hardening (user_id field for multi-user)
 - Frontend UI (monitoring dashboard, call brief viewer, phone approval)
 - Refresh token rotation
-- Rate limiting per user
+- Integration test suite with real Supabase
 
 ## Blockers
 - None

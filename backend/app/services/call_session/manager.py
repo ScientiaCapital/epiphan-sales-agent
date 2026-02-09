@@ -39,20 +39,41 @@ class CallSessionManager:
         """Number of active sessions."""
         return len(self._sessions)
 
-    def get_session(self, session_id: str) -> CallSessionState | None:
-        """Get a session by ID."""
-        return self._sessions.get(session_id)
+    def get_session(
+        self, session_id: str, user_id: str | None = None
+    ) -> CallSessionState | None:
+        """Get a session by ID, optionally verifying ownership.
+
+        Args:
+            session_id: Session identifier.
+            user_id: If provided, verify that the session belongs to this user.
+                Returns None if ownership check fails (same as not found).
+        """
+        session = self._sessions.get(session_id)
+        if session and user_id and session.user_id != user_id:
+            logger.warning(
+                "Session ownership mismatch",
+                extra={
+                    "session_id": session_id,
+                    "owner": session.user_id,
+                    "requester": user_id,
+                },
+            )
+            return None
+        return session
 
     async def start_session(
         self,
         lead_id: str,
         lead_email: str | None = None,
+        user_id: str = "anonymous",
     ) -> tuple[CallSessionState, dict[str, Any]]:
         """Start a new call session and generate a call brief.
 
         Args:
             lead_id: Lead identifier (HubSpot ID or internal).
             lead_email: Optional email for enrichment lookup.
+            user_id: JWT sub claim — ties the session to its creator.
 
         Returns:
             Tuple of (session_state, brief_dict). Brief dict is the full
@@ -61,6 +82,7 @@ class CallSessionManager:
         session_id = str(uuid.uuid4())
         session = CallSessionState(
             session_id=session_id,
+            user_id=user_id,
             lead_id=lead_id,
             lead_email=lead_email,
             started_at=datetime.now(timezone.utc),

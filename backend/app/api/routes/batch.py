@@ -7,10 +7,11 @@ full agent pipeline: Research → Script Selection → Email Generation.
 import asyncio
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.core.rate_limit import AGENT_RATE_LIMIT, limiter
 from app.data.lead_schemas import Lead
 from app.middleware.auth import require_auth
 from app.services.langgraph.agents import (
@@ -142,7 +143,8 @@ async def process_single_lead(
 
 
 @router.post("/process", response_model=BatchResponse)
-async def batch_process_leads(request: BatchRequest) -> BatchResponse:
+@limiter.limit(AGENT_RATE_LIMIT)
+async def batch_process_leads(request: Request, body: BatchRequest) -> BatchResponse:
     """
     Process multiple leads through the full agent pipeline.
 
@@ -153,20 +155,20 @@ async def batch_process_leads(request: BatchRequest) -> BatchResponse:
 
     Returns results for all leads plus summary statistics.
     """
-    semaphore = asyncio.Semaphore(request.concurrency)
+    semaphore = asyncio.Semaphore(body.concurrency)
 
     async def process_with_limit(lead: Lead) -> LeadResult:
         async with semaphore:
             return await process_single_lead(
                 lead=lead,
-                persona_match=request.persona_match,
-                trigger=request.trigger,
-                email_type=request.email_type,
-                sequence_step=request.sequence_step,
+                persona_match=body.persona_match,
+                trigger=body.trigger,
+                email_type=body.email_type,
+                sequence_step=body.sequence_step,
             )
 
     # Process all leads concurrently
-    tasks = [process_with_limit(lead) for lead in request.leads]
+    tasks = [process_with_limit(lead) for lead in body.leads]
     results = await asyncio.gather(*tasks)
 
     # Calculate summary
@@ -208,7 +210,8 @@ class StreamEvent(BaseModel):
 
 
 @router.post("/process/stream")
-async def batch_process_stream(request: StreamingBatchRequest) -> StreamingResponse:
+@limiter.limit(AGENT_RATE_LIMIT)
+async def batch_process_stream(request: Request, body: StreamingBatchRequest) -> StreamingResponse:
     """
     Process leads in parallel with real-time SSE progress streaming.
 
@@ -234,11 +237,11 @@ async def batch_process_stream(request: StreamingBatchRequest) -> StreamingRespo
     from app.services.langgraph.agents.orchestrator import MasterOrchestratorAgent
 
     async def event_generator() -> AsyncGenerator[str, None]:
-        semaphore = asyncio.Semaphore(request.concurrency)
+        semaphore = asyncio.Semaphore(body.concurrency)
         orchestrator = MasterOrchestratorAgent()
         completed = 0
         failed = 0
-        total = len(request.leads)
+        total = len(body.leads)
 
         async def process_lead(lead: Lead) -> tuple[str, dict[str, Any] | None, str | None]:
             """Process a single lead and return (hubspot_id, result, error)."""
@@ -246,17 +249,17 @@ async def batch_process_stream(request: StreamingBatchRequest) -> StreamingRespo
                 try:
                     result = await orchestrator.run(
                         lead=lead,
-                        process_config={"skip_outreach": request.skip_outreach},
+                        process_config={"skip_outreach": body.skip_outreach},
                     )
                     return (lead.hubspot_id, result, None)
                 except Exception as e:
                     return (lead.hubspot_id, None, str(e))
 
         # Create all tasks
-        tasks = [process_lead(lead) for lead in request.leads]
+        tasks = [process_lead(lead) for lead in body.leads]
 
         # Stream progress events for all leads starting
-        for lead in request.leads:
+        for lead in body.leads:
             progress_event = StreamEvent(
                 event_type="progress",
                 lead_id=lead.hubspot_id,
@@ -326,7 +329,8 @@ class TokenStreamRequest(BaseModel):
 
 
 @router.post("/process/stream/tokens")
-async def process_lead_stream_tokens(request: TokenStreamRequest) -> StreamingResponse:
+@limiter.limit(AGENT_RATE_LIMIT)
+async def process_lead_stream_tokens(request: Request, body: TokenStreamRequest) -> StreamingResponse:
     """
     Process a single lead with token-level streaming.
 
@@ -354,8 +358,8 @@ async def process_lead_stream_tokens(request: TokenStreamRequest) -> StreamingRe
 
         try:
             async for event in orchestrator.stream_tokens(
-                lead=request.lead,
-                process_config={"skip_outreach": request.skip_outreach},
+                lead=body.lead,
+                process_config={"skip_outreach": body.skip_outreach},
             ):
                 yield f"data: {dumps(event)}\n\n"
 
