@@ -2,21 +2,36 @@
 
 ## Session: 2026-02-09
 
-### Focus
-Housekeeping + tech debt — WebSocket session ownership, per-user rate limiting, devil's advocate agent.
+### Completed This Session
+1. **WebSocket Session Ownership Hardening** (security fix) — commit `243800c`
+   - [x] Added `user_id` field to `CallSessionState` (default="anonymous")
+   - [x] Ownership verification on all REST + WS handlers (IDOR prevention)
+   - [x] 13 tests (manager, REST, WS handler ownership)
 
-### In Progress
-1. **WebSocket Session Ownership Hardening** — Add user_id to sessions, enforce ownership checks
-2. **Rate Limiting Per User** — Switch from IP-based to user-based, apply decorators across routes
-3. **Devil's Advocate Agent** — First custom subagent for post-implementation review
+2. **Per-User Rate Limiting** (security fix) — commit `243800c`
+   - [x] JWT-based key function (`user:{sub}`, fallback to IP)
+   - [x] `@limiter.limit(AGENT_RATE_LIMIT)` on all 13 LLM-calling endpoints
+   - [x] Tiered limits: AGENT=10/min, WRITE=20/min, READ=60/min, DEFAULT=100/min
+   - [x] 12 tests (key extraction, tiers, decorator verification)
+
+3. **Devil's Advocate Agent** — commit `243800c`
+   - [x] Created `.claude/agents/devils-advocate.md` (read-only reviewer)
+   - [x] Ran review → found HIGH finding (WS handler ownership gap) → fixed
+
+4. **Housekeeping** — commit `243800c`
+   - [x] Cleaned stale worktree registry entry
+   - [x] Updated TASK.md, PROJECT_CONTEXT.md for session
+   - [x] Initialized cost tracking (`~/.claude/daily-cost.json`)
+   - [x] Added ruff `per-file-ignores` for FastAPI patterns (ARG001, B008)
 
 ### Code Quality Status
 | Check | Status |
 |-------|--------|
-| Tests | 1314 passed, 5 skipped |
+| Tests | 1334 passed, 5 skipped |
 | mypy | 0 errors (94 source files) |
 | Ruff lint | 0 errors |
-| Secrets | 0 found |
+| Secrets | 0 real (6 .env.example false positives) |
+| CVEs | 0 critical (1 LOW: markdownify CVSS 3.1) |
 
 ---
 

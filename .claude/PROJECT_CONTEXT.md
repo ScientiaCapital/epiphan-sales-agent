@@ -3,20 +3,23 @@
 **Branch**: main | **Updated**: 2026-02-09
 
 ## Status
-Production-ready AI sales assistant with 5 LangGraph agents, Call Brief Assembler with persistence, Call Outcome Tracking with brief linkage, Brief Effectiveness Deep Analytics, Clay.com fallback enrichment, Voice AI Call Session integration (WebSocket + REST), Master Orchestrator with parallel execution and review gates, tiered Apollo enrichment, observability endpoints, LangSmith tracing, and real-time Harvester sync. JWT API authentication and Docker deployment. 1314 tests (1314 passed, 5 skipped), 0 mypy errors, 0 ruff lint errors.
+Production-ready AI sales assistant with 5 LangGraph agents, Call Brief Assembler with persistence, Call Outcome Tracking with brief linkage, Brief Effectiveness Deep Analytics, Clay.com fallback enrichment, Voice AI Call Session integration (WebSocket + REST), Master Orchestrator with parallel execution and review gates, tiered Apollo enrichment, per-user rate limiting (slowapi), WebSocket session ownership, observability endpoints, LangSmith tracing, and real-time Harvester sync. JWT API authentication and Docker deployment. 1334 tests (1334 passed, 5 skipped), 0 mypy errors, 0 ruff lint errors.
 
 ## Today's Focus
-Housekeeping + tech debt — WebSocket session ownership hardening, per-user rate limiting, devil's advocate agent.
+Completed: WebSocket session ownership hardening, per-user rate limiting, devil's advocate agent, housekeeping.
 
 ## Done (This Session)
-- (session just started)
+- WebSocket session ownership: IDOR prevention with `user_id` binding on sessions (13 tests)
+- Per-user rate limiting: JWT-based slowapi key function, decorators on all LLM endpoints (12 tests)
+- Devil's advocate agent: `.claude/agents/devils-advocate.md` (read-only reviewer)
+- Housekeeping: Worktree cleanup, doc updates, cost tracking init, ruff per-file-ignores
 
 ## Recent Commits
+- `243800c` fix: Harden WebSocket session ownership + add per-user rate limiting (25 tests)
 - `3105e27` feat: Wire orphaned memory modules into production consumers (51 tests)
 - `22bf5f5` chore: Trim project docs + fix ruff lint error
 - `ffd68ff` fix: Secure phone endpoints + fix tier score aggregation bug (5 tests)
 - `52820dc` feat: Add Voice AI call session integration — WebSocket + REST (47 tests)
-- `a4831f6` feat: Add Clay.com webhook-based enrichment (49 tests)
 
 ## Key Features Implemented
 - **Voice AI Call Session**: WebSocket + REST endpoints for live call support — call briefs, competitor battlecards, objection handling, outcome logging

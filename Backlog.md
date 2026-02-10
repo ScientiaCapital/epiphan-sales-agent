@@ -21,6 +21,8 @@
 
 ## Tech Debt
 - [ ] Fix integration test fixture (`_supabase_client`)
+- [ ] Upgrade markdownify 0.13.1 → 0.14.1 (CVE-2025-46656, CVSS 3.1 LOW — memory consumption via large headline prefixes)
+- [ ] Refresh token rotation (currently single 15-min JWT, no revocation)
 
 ---
 
