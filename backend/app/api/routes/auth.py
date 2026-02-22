@@ -38,7 +38,7 @@ async def issue_token(request: TokenRequest) -> TokenResponse:
     For development/testing. Production should use SSO/OAuth.
     """
     # Constant-time comparison to prevent timing attacks
-    if not hmac.compare_digest(request.api_key, settings.jwt_secret_key):
+    if not hmac.compare_digest(request.api_key, settings.epiphan_api_key):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",

@@ -11,7 +11,7 @@ More phones = More dials = More conversations = More deals = Food on the table f
 import hashlib
 import hmac
 import logging
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -382,7 +382,7 @@ async def approve_hubspot_sync(request: SyncApprovalRequest) -> SyncApprovalResp
                 failed_count += 1
                 continue
 
-            record = phone_records.data[0]
+            record = cast(dict[str, Any], phone_records.data[0])
             email = record["email"]
 
             # Skip if already synced

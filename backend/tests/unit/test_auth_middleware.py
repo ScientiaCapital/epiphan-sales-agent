@@ -28,6 +28,7 @@ from app.middleware.auth import (
 # ---------------------------------------------------------------------------
 
 TEST_SECRET = "test-secret-key-for-jwt-testing-minimum-32-chars"
+TEST_API_KEY = "test-api-key-separate-from-jwt-secret-value"
 TEST_ALGORITHM = "HS256"
 
 
@@ -57,6 +58,7 @@ def _auth_settings():
         patch("app.api.routes.auth.settings", mock_settings),
     ):
         mock_settings.jwt_secret_key = TEST_SECRET
+        mock_settings.epiphan_api_key = TEST_API_KEY
         mock_settings.jwt_algorithm = TEST_ALGORITHM
         mock_settings.jwt_access_token_expire_minutes = 15
         yield mock_settings
@@ -251,7 +253,7 @@ class TestAuthTokenEndpoint:
         """Should return a JWT when given valid API key."""
         response = auth_client.post(
             "/api/auth/token",
-            json={"api_key": TEST_SECRET, "user_id": "tim"},
+            json={"api_key": TEST_API_KEY, "user_id": "tim"},
         )
         assert response.status_code == 200
         data = response.json()
@@ -278,8 +280,126 @@ class TestAuthTokenEndpoint:
         """Token returned by endpoint should be decodable."""
         response = auth_client.post(
             "/api/auth/token",
-            json={"api_key": TEST_SECRET, "user_id": "tim"},
+            json={"api_key": TEST_API_KEY, "user_id": "tim"},
         )
         token = response.json()["access_token"]
         decoded = jwt.decode(token, TEST_SECRET, algorithms=[TEST_ALGORITHM])
         assert decoded["sub"] == "tim"
+
+    def test_jwt_secret_rejected_as_api_key(self, auth_client: TestClient) -> None:
+        """JWT secret should NOT work as API key (they are separate now)."""
+        response = auth_client.post(
+            "/api/auth/token",
+            json={"api_key": TEST_SECRET, "user_id": "tim"},
+        )
+        assert response.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Startup Secret Validation Tests
+# ---------------------------------------------------------------------------
+
+
+class TestStartupSecretValidation:
+    """Tests for _validate_production_secrets() startup guard."""
+
+    def test_production_default_jwt_secret_raises(self) -> None:
+        """Production with default JWT secret should crash."""
+        with patch("app.main.settings") as mock_settings:
+            mock_settings.environment = "production"
+            mock_settings.jwt_secret_key = "change-me-in-production"
+            mock_settings.epiphan_api_key = "some-valid-api-key"
+
+            from app.main import _validate_production_secrets
+
+            with pytest.raises(SystemExit, match="JWT_SECRET_KEY is still the default"):
+                _validate_production_secrets()
+
+    def test_production_empty_api_key_raises(self) -> None:
+        """Production with empty API key should crash."""
+        with patch("app.main.settings") as mock_settings:
+            mock_settings.environment = "production"
+            mock_settings.jwt_secret_key = "a-real-production-secret-key"
+            mock_settings.epiphan_api_key = ""
+
+            from app.main import _validate_production_secrets
+
+            with pytest.raises(SystemExit, match="EPIPHAN_API_KEY is not set"):
+                _validate_production_secrets()
+
+    def test_production_jwt_equals_api_key_raises(self) -> None:
+        """Production with JWT == API key should crash (defeats the purpose)."""
+        with patch("app.main.settings") as mock_settings:
+            mock_settings.environment = "production"
+            mock_settings.jwt_secret_key = "same-secret-for-both"
+            mock_settings.epiphan_api_key = "same-secret-for-both"
+
+            from app.main import _validate_production_secrets
+
+            with pytest.raises(SystemExit, match="must be different"):
+                _validate_production_secrets()
+
+    def test_production_all_valid_passes(self) -> None:
+        """Production with proper secrets should not raise."""
+        with patch("app.main.settings") as mock_settings:
+            mock_settings.environment = "production"
+            mock_settings.jwt_secret_key = "a-real-jwt-secret-key-for-signing"
+            mock_settings.epiphan_api_key = "a-separate-api-key-for-exchange"
+
+            from app.main import _validate_production_secrets
+
+            _validate_production_secrets()  # Should not raise
+
+    def test_development_default_jwt_secret_allowed(self) -> None:
+        """Development env should allow default JWT secret."""
+        with patch("app.main.settings") as mock_settings:
+            mock_settings.environment = "development"
+            mock_settings.jwt_secret_key = "change-me-in-production"
+            mock_settings.epiphan_api_key = ""
+
+            from app.main import _validate_production_secrets
+
+            _validate_production_secrets()  # Should not raise
+
+    def test_staging_default_jwt_secret_allowed(self) -> None:
+        """Staging env should allow default JWT secret (only production is strict)."""
+        with patch("app.main.settings") as mock_settings:
+            mock_settings.environment = "staging"
+            mock_settings.jwt_secret_key = "change-me-in-production"
+            mock_settings.epiphan_api_key = ""
+
+            from app.main import _validate_production_secrets
+
+            _validate_production_secrets()  # Should not raise
+
+    def test_production_multiple_errors_all_listed(self) -> None:
+        """All errors should be reported at once, not fail-fast."""
+        with patch("app.main.settings") as mock_settings:
+            mock_settings.environment = "production"
+            mock_settings.jwt_secret_key = "change-me-in-production"
+            mock_settings.epiphan_api_key = ""
+
+            from app.main import _validate_production_secrets
+
+            with pytest.raises(SystemExit) as exc_info:
+                _validate_production_secrets()
+
+            message = str(exc_info.value)
+            assert "JWT_SECRET_KEY is still the default" in message
+            assert "EPIPHAN_API_KEY is not set" in message
+
+    def test_production_jwt_equals_api_key_not_triggered_when_api_key_empty(self) -> None:
+        """Empty API key should NOT trigger the 'must be different' check."""
+        with patch("app.main.settings") as mock_settings:
+            mock_settings.environment = "production"
+            mock_settings.jwt_secret_key = "a-real-secret"
+            mock_settings.epiphan_api_key = ""
+
+            from app.main import _validate_production_secrets
+
+            with pytest.raises(SystemExit) as exc_info:
+                _validate_production_secrets()
+
+            message = str(exc_info.value)
+            assert "EPIPHAN_API_KEY is not set" in message
+            assert "must be different" not in message

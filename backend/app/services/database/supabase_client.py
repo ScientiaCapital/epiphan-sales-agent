@@ -116,7 +116,7 @@ class SupabaseClient:
             .limit(limit)
             .execute()
         )
-        return result.data or []
+        return cast(list[dict[str, Any]], result.data) if result.data else []
 
     def get_prioritized_leads(
         self,
@@ -153,7 +153,7 @@ class SupabaseClient:
             .range(offset, offset + limit - 1)
             .execute()
         )
-        return result.data or []
+        return cast(list[dict[str, Any]], result.data) if result.data else []
 
     def update_lead_scores(
         self,
@@ -201,7 +201,7 @@ class SupabaseClient:
             .eq("id", lead_id)
             .execute()
         )
-        return result.data[0] if result.data else {}
+        return cast(dict[str, Any], result.data[0]) if result.data else {}
 
     def get_lead_count_by_tier(self) -> dict[str, int]:
         """Get count of leads in each tier."""
@@ -293,7 +293,7 @@ class SupabaseClient:
             .limit(limit)
             .execute()
         )
-        return result.data or []
+        return cast(list[dict[str, Any]], result.data) if result.data else []
 
     def mark_phone_synced(self, phone_id: int) -> dict[str, Any]:
         """
@@ -318,7 +318,7 @@ class SupabaseClient:
             .eq("id", phone_id)
             .execute()
         )
-        return result.data[0] if result.data else {}
+        return cast(dict[str, Any], result.data[0]) if result.data else {}
 
     def get_phones_by_email(self, email: str) -> list[dict[str, Any]]:
         """
@@ -339,7 +339,7 @@ class SupabaseClient:
             .order("received_at", desc=True)
             .execute()
         )
-        return result.data or []
+        return cast(list[dict[str, Any]], result.data) if result.data else []
 
     # =========================================================================
     # Outreach Operations (for Phase 2)
@@ -364,7 +364,7 @@ class SupabaseClient:
             query = query.lte("scheduled_at", before)
 
         result = query.order("scheduled_at").limit(limit).execute()
-        return result.data or []
+        return cast(list[dict[str, Any]], result.data) if result.data else []
 
     # =========================================================================
     # Call Outcome Operations (BDR call tracking)
@@ -395,7 +395,7 @@ class SupabaseClient:
             .limit(limit)
             .execute()
         )
-        return result.data or []
+        return cast(list[dict[str, Any]], result.data) if result.data else []
 
     def get_outcomes_by_date(self, date_str: str) -> list[dict[str, Any]]:
         """
@@ -417,7 +417,7 @@ class SupabaseClient:
             .order("called_at", desc=True)
             .execute()
         )
-        return result.data or []
+        return cast(list[dict[str, Any]], result.data) if result.data else []
 
     def get_outcomes_by_date_range(
         self, start_date: str, end_date: str
@@ -442,7 +442,7 @@ class SupabaseClient:
             .order("called_at", desc=True)
             .execute()
         )
-        return result.data or []
+        return cast(list[dict[str, Any]], result.data) if result.data else []
 
     def get_pending_follow_ups(
         self, before_date: str, limit: int = 100
@@ -466,7 +466,7 @@ class SupabaseClient:
             .limit(limit)
             .execute()
         )
-        return result.data or []
+        return cast(list[dict[str, Any]], result.data) if result.data else []
 
     def get_unsynced_call_outcomes(self, limit: int = 100) -> list[dict[str, Any]]:
         """Get call outcomes not yet synced to HubSpot."""
@@ -478,7 +478,7 @@ class SupabaseClient:
             .limit(limit)
             .execute()
         )
-        return result.data or []
+        return cast(list[dict[str, Any]], result.data) if result.data else []
 
     def mark_outcome_synced(
         self, outcome_id: str, hubspot_engagement_id: str
@@ -505,7 +505,7 @@ class SupabaseClient:
             .eq("id", outcome_id)
             .execute()
         )
-        return result.data[0] if result.data else {}
+        return cast(dict[str, Any], result.data[0]) if result.data else {}
 
     def update_lead(self, lead_id: str, data: dict[str, Any]) -> dict[str, Any]:
         """
@@ -527,7 +527,7 @@ class SupabaseClient:
             .eq("id", lead_id)
             .execute()
         )
-        return result.data[0] if result.data else {}
+        return cast(dict[str, Any], result.data[0]) if result.data else {}
 
     # -------------------------------------------------------------------------
     # Call Briefs
@@ -680,7 +680,7 @@ class SupabaseClient:
             .limit(limit)
             .execute()
         )
-        return result.data or []
+        return cast(list[dict[str, Any]], result.data) if result.data else []
 
     def mark_clay_synced(self, enrichment_id: str) -> None:
         """

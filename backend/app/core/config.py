@@ -65,6 +65,7 @@ class Settings(BaseSettings):
 
     # Security
     jwt_secret_key: str = Field(default="change-me-in-production")
+    epiphan_api_key: str = Field(default="")
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 15
     crm_encryption_key: str = Field(default="")

@@ -6,7 +6,7 @@ schedule follow-ups. No AI/LLM calls — pure data tracking.
 
 import logging
 from datetime import date, datetime, timedelta, timezone
-from typing import Any
+from typing import Any, cast
 
 from app.data.call_outcome_schemas import (
     BriefEffectivenessResponse,
@@ -313,7 +313,7 @@ class CallOutcomeService:
             .single()
             .execute()
         )
-        record = result.data
+        record = cast(dict[str, Any], result.data)
         if not record:
             raise ValueError(f"Call outcome {outcome_id} not found")
 

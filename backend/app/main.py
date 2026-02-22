@@ -23,12 +23,36 @@ from app.core.config import settings
 from app.core.rate_limit import setup_rate_limiting
 
 
+def _validate_production_secrets() -> None:
+    """Crash on startup if production is running with unsafe defaults."""
+    if settings.environment != "production":
+        return
+
+    errors: list[str] = []
+
+    if settings.jwt_secret_key == "change-me-in-production":
+        errors.append("JWT_SECRET_KEY is still the default value")
+
+    if not settings.epiphan_api_key:
+        errors.append("EPIPHAN_API_KEY is not set")
+
+    if settings.epiphan_api_key and settings.jwt_secret_key == settings.epiphan_api_key:
+        errors.append("JWT_SECRET_KEY and EPIPHAN_API_KEY must be different values")
+
+    if errors:
+        raise SystemExit(
+            "FATAL: Production secret validation failed:\n"
+            + "\n".join(f"  - {e}" for e in errors)
+        )
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifecycle management."""
     # Startup
     print(f"Starting {settings.app_name} v{settings.version}")
     print(f"Environment: {settings.environment}")
+    _validate_production_secrets()
 
     yield
 
