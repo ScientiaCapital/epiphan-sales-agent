@@ -1,28 +1,26 @@
 # Current Task Status
 
-## Session: 2026-02-22
+## Session: 2026-02-22 (Session 2 — Security Hardening)
 
 ### Completed This Session
-1. **Production Deployment to Railway + Supabase** — commit pending
-   - [x] Generated production secrets (JWT, Apollo, Harvester, CRM encryption)
-   - [x] Created Supabase project (`ulvjeeictfhfbzivexnf`, us-east-1, 12 tables)
-   - [x] Ran all 8 database migrations (leads, outreach, checkpoints, semantic_store, phone webhooks, call_outcomes, call_briefs, clay)
-   - [x] Parameterized Dockerfile (workers, port, pinned uv:0.9)
-   - [x] Created `railway.toml` (Dockerfile builder, healthcheck)
-   - [x] Created `.env.production.example` (production env var template)
-   - [x] Created `.dockerignore` (root-level build context filter)
-   - [x] Added 5 missing prod deps (supabase, sqlalchemy, hubspot-api-client, cryptography, langsmith)
-   - [x] Deployed to Railway: `epiphan-api-production.up.railway.app`
-   - [x] Verified: health, root, auth, protected endpoints, webhook rejection
-   - [x] Fixed PORT vs API_PORT mismatch (devil's advocate finding)
-   - [x] Pinned uv:latest → uv:0.9 (reproducibility)
-   - [x] Renamed pyproject.toml project name from placeholder
+1. **Security: Separate API key from JWT secret** — commit `49b5f95`
+   - [x] Added `epiphan_api_key` field to Settings (config.py)
+   - [x] Token exchange validates against `epiphan_api_key` (not `jwt_secret_key`)
+   - [x] Startup guard: `_validate_production_secrets()` crashes production on bad secrets
+   - [x] 9 new tests (28 total in test_auth_middleware.py)
+   - [x] Updated `.env.example` and `.env.production.example`
+   - [x] Set `EPIPHAN_API_KEY` in Railway production (verified different from JWT_SECRET_KEY)
+
+2. **mypy cleanup: 55 errors → 0** — commit `49b5f95`
+   - [x] `cast()` on all Supabase `.data` returns in supabase_client.py (15 errors)
+   - [x] `cast()` on webhooks.py phone record access (37 errors)
+   - [x] `cast()` on call_outcomes/service.py single record (3 errors)
 
 ### Code Quality Status
 | Check | Status |
 |-------|--------|
-| Tests | 1334 passed, 5 skipped |
-| mypy | 3 errors (pre-existing in webhooks.py) |
+| Tests | 1343 passed, 5 skipped |
+| mypy | **0 errors** (55 resolved this session) |
 | Ruff lint | 0 errors |
 | Secrets | 0 real (6 .env.example false positives) |
 | Security sweep | PASS (gitleaks, grep, git history) |

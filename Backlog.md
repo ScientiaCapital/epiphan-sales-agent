@@ -1,10 +1,10 @@
 # Product Backlog
 
 ## Priority 1 - Production Hardening (from observer/devil's advocate)
-- [ ] **[R1] Separate API key from JWT secret** — `auth.py` uses `jwt_secret_key` as API key. Anyone with the API key can forge tokens. Add `EPIPHAN_API_KEY` env var. Impact: HIGH, Effort: SMALL (1-2h)
-- [ ] **[R2] Startup validation for critical secrets** — App starts with default `change-me-in-production`. Add `lifespan()` guard: crash in production if secrets are defaults. Impact: HIGH, Effort: SMALL (<1h)
+- [x] ~~**[R1] Separate API key from JWT secret**~~ — DONE 2026-02-22 (commit `49b5f95`)
+- [x] ~~**[R2] Startup validation for critical secrets**~~ — DONE 2026-02-22 (commit `49b5f95`)
 - [ ] **[R3] Call `setup_checkpoint_tables()` at startup** — LangGraph tables exist via migration but helper not invoked. Falls back to MemorySaver silently. Impact: MEDIUM, Effort: SMALL
-- [ ] **[W1] Fix 3 mypy errors in webhooks.py** — Type narrowing for Supabase JSON responses. Pre-existing. Impact: LOW, Effort: SMALL
+- [x] ~~**[W1] Fix mypy errors**~~ — DONE 2026-02-22, all 55 errors resolved (commit `49b5f95`)
 - [ ] **[W4] Scrub `.env.example` of real-looking keys** — `sb_secret_*`, `sb_publishable_*` from old commits. Consider `git filter-repo`. Impact: LOW, Effort: MEDIUM
 
 ## Priority 2 - Frontend

@@ -150,6 +150,8 @@
 - Bearer token required on all non-public endpoints
 - 15-minute token expiry (configurable via `ACCESS_TOKEN_EXPIRE_MINUTES`)
 - Constant-time API key comparison (timing-safe)
+- **Separate secrets**: `JWT_SECRET_KEY` (token signing) vs `EPIPHAN_API_KEY` (token exchange) — prevents API key holders from forging JWTs
+- **Startup validation**: `_validate_production_secrets()` crashes if production runs with default/empty/identical secrets
 - Public routes: /health, /, /docs, /api/auth/token, webhooks (HMAC auth)
 
 ### 10. Memory Module Wiring Pattern
