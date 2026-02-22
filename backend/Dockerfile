@@ -8,20 +8,21 @@
 # ---------------------------------------------------------------------------
 FROM python:3.12-slim AS builder
 
-# Install uv for fast dependency resolution
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Install uv for fast dependency resolution (pinned for reproducibility)
+COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
 # Copy dependency files first (layer caching — deps change less often than code)
-COPY pyproject.toml uv.lock ./
+# Note: paths are relative to project root (Railway build context)
+COPY backend/pyproject.toml backend/uv.lock ./
 
 # Install production dependencies only (no dev deps)
 RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy application code
-COPY app/ app/
-COPY migrations/ migrations/
+COPY backend/app/ app/
+COPY backend/migrations/ migrations/
 
 # ---------------------------------------------------------------------------
 # Stage 2: Runtime — minimal image with just the app and venv
@@ -56,5 +57,7 @@ USER appuser
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')" || exit 1
 
-# Run with uvicorn — 4 workers for production
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "4"]
+# Run with uvicorn — worker count configurable for WebSocket compatibility
+# Default: 1 worker (required for in-memory WebSocket sessions)
+# Scale workers only after migrating sessions to Redis
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-${API_PORT:-8001}} --workers ${UVICORN_WORKERS:-1}"]

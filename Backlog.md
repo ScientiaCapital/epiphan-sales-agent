@@ -1,11 +1,11 @@
 # Product Backlog
 
-## Priority 1 - Production Deployment
-- [ ] Set up production environment variables
-- [ ] Run SQL migrations (001, 002, 003, 004, 005, 006)
-- [ ] Configure public webhook URLs
-- [ ] Set up monitoring/alerting
-- [ ] Deploy Docker container to production
+## Priority 1 - Production Hardening (from observer/devil's advocate)
+- [ ] **[R1] Separate API key from JWT secret** — `auth.py` uses `jwt_secret_key` as API key. Anyone with the API key can forge tokens. Add `EPIPHAN_API_KEY` env var. Impact: HIGH, Effort: SMALL (1-2h)
+- [ ] **[R2] Startup validation for critical secrets** — App starts with default `change-me-in-production`. Add `lifespan()` guard: crash in production if secrets are defaults. Impact: HIGH, Effort: SMALL (<1h)
+- [ ] **[R3] Call `setup_checkpoint_tables()` at startup** — LangGraph tables exist via migration but helper not invoked. Falls back to MemorySaver silently. Impact: MEDIUM, Effort: SMALL
+- [ ] **[W1] Fix 3 mypy errors in webhooks.py** — Type narrowing for Supabase JSON responses. Pre-existing. Impact: LOW, Effort: SMALL
+- [ ] **[W4] Scrub `.env.example` of real-looking keys** — `sb_secret_*`, `sb_publishable_*` from old commits. Consider `git filter-repo`. Impact: LOW, Effort: MEDIUM
 
 ## Priority 2 - Frontend
 - [ ] Build monitoring dashboard UI
@@ -18,11 +18,17 @@
 - [ ] Supabase persistence for batch tracking (currently in-memory)
 - [ ] Historical credit usage charts
 - [ ] Webhook retry logic for failures
+- [ ] Redis-backed WebSocket sessions (enables multi-worker scaling)
+- [ ] Redis-backed rate limiting (slowapi, enables multi-worker)
+- [ ] Supabase RLS with anon_key for read operations [R3 from observer]
+- [ ] Railway restart policy (`restartPolicyType = "ON_FAILURE"`, maxRetries: 3)
 
 ## Tech Debt
 - [ ] Fix integration test fixture (`_supabase_client`)
-- [ ] Upgrade markdownify 0.13.1 → 0.14.1 (CVE-2025-46656, CVSS 3.1 LOW — memory consumption via large headline prefixes)
+- [ ] Upgrade markdownify 0.13.1 → 0.14.1 (CVE-2025-46656, CVSS 3.1 LOW)
 - [ ] Refresh token rotation (currently single 15-min JWT, no revocation)
+- [ ] Dockerfile HEALTHCHECK should use `${API_PORT:-8001}` not hardcoded 8001
+- [ ] `.env.production.example` pooler docs: session-mode (5432) for app, direct (5432) for DDL only
 
 ---
 

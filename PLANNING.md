@@ -158,3 +158,12 @@
 - MessageTrimmer + ConversationSummarizer instantiated in MasterOrchestrator as utilities — ready for message history activation
 - All wiring uses optional dependencies with graceful degradation: if memory fails, the consumer continues without it
 - Module-level singletons remain the pattern (consistent with existing agent singletons)
+
+### 11. Production Infrastructure (2026-02-22)
+- **Railway**: API container (`epiphan-api-production.up.railway.app`), 1 worker (WebSocket safety)
+- **Supabase**: Managed PostgreSQL (us-east-1, 12 tables, pgvector enabled)
+- **Redis**: Railway-provisioned (internal network, used for caching)
+- **Build**: Multi-stage Docker, uv:0.9 pinned, root-relative COPY paths (Railway uses project root as build context)
+- **Healthcheck**: `/health` with 120s timeout
+- **Session-mode pooler**: `aws-1-us-east-1.pooler.supabase.com:5432` (supports DDL, confirmed working)
+- **Cost**: ~$10-50/mo infrastructure + API usage costs

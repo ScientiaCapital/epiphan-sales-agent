@@ -1,0 +1,39 @@
+# Only include backend/ for Docker builds
+# Everything else is excluded to minimize build context
+
+# Exclude non-backend directories
+.claude/
+.github/
+.ruff_cache/
+.serena/
+archive/
+costs/
+docs/
+frontend/
+plugins/
+supabase/
+
+# Exclude root files
+*.md
+.env
+.env.*
+.gitignore
+docker-compose.yml
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Testing (inside backend/)
+backend/tests/
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+backend/.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
