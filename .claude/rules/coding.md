@@ -20,7 +20,7 @@
 - Ruff compliance: logger defined AFTER imports (E402), unused params prefixed `_` (ARG001/ARG002)
 
 ## Rules
-- **No OpenAI** — LLM calls use `langchain-anthropic` (Claude) only
+- **No OpenAI** — primary LLM is Claude via `langchain-anthropic`. `langchain_openai.ChatOpenAI` is used as an OpenAI-compatible SDK adapter for Cerebras, DeepSeek, and OpenRouter (non-OpenAI endpoints with custom `base_url`) — do NOT add actual OpenAI API calls
 - All secrets in `.env` — never hardcoded
 - Maintain 0 mypy errors and 0 ruff errors before committing
 - Phone enrichment must ALWAYS be included in lead processing workflows

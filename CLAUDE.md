@@ -66,7 +66,7 @@ CLAY_WEBHOOK_SECRET=
 
 ## Code Style Rules
 
-- **No OpenAI** — all LLM calls use `langchain-anthropic` (Claude) only
+- **No OpenAI** — primary LLM is Claude (`langchain-anthropic`). `ChatOpenAI` is used as adapter for Cerebras/DeepSeek/OpenRouter (custom `base_url`, no OpenAI API calls)
 - 0 mypy errors and 0 ruff errors required before committing
 - E402: Logger defined AFTER all imports
 - ARG001/ARG002: Prefix unused params with `_`
