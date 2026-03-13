@@ -1,19 +1,19 @@
-#!/bin/bash
-set -e
-echo "Setting up epiphan-sales-agent..."
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Check for required env
-if [ ! -f .env ] && [ ! -f backend/.env ]; then
-  echo "Warning: No .env file found. Required vars: ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY, APOLLO_API_KEY"
+echo "Initializing epiphan-sales-agent (Python/FastAPI, uv)..."
+
+if ! command -v uv &>/dev/null; then
+  echo "Error: uv is not installed. Install: curl -LsSf https://astral.sh/uv/install.sh | sh"
+  exit 1
 fi
 
-# Install Python backend deps via uv
-echo "Installing backend deps..."
-cd backend
+cd "$(dirname "$0")/backend"
 uv sync
 
-echo "Ready!"
-echo "  Start server: cd backend && uv run uvicorn app.main:app --reload --port 8001"
-echo "  Run tests:    cd backend && uv run pytest tests/ -v"
-echo "  Lint:         cd backend && uv run ruff check ."
-echo "  Type check:   cd backend && uv run mypy app/"
+echo ""
+echo "Done."
+echo "Start server: cd backend && uv run uvicorn app.main:app --reload --port 8001"
+echo "Run tests:    cd backend && uv run pytest tests/ -v"
+echo "Lint:         cd backend && uv run ruff check ."
+echo "Type check:   cd backend && uv run mypy app/"
