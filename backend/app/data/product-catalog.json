@@ -1,0 +1,144 @@
+{
+  "version": "2026-03-10",
+  "families": [
+    {
+      "id": "pearl-2",
+      "name": "Pearl-2",
+      "category": "encoder",
+      "tagline": "Flagship all-in-one video production system",
+      "use_cases": ["large lecture halls", "corporate AV", "multi-camera production", "surgical video capture"],
+      "key_features": ["up to 6 video inputs (HDMI+SDI)", "4K recording + streaming", "hardware encoding", "built-in touchscreen", "Epiphan Cloud management"],
+      "competitors": ["Extron SMP 351", "Crestron NVX", "Blackmagic ATEM"],
+      "products": [
+        {"name": "Pearl-2 Rackmount", "sku": "pearl-2-rack", "price_usd": 8475, "note": "Rack-mount form factor with twin PSU option"},
+        {"name": "Pearl-2", "sku": "pearl-2", "price_usd": 7999, "note": "Desktop form factor"}
+      ]
+    },
+    {
+      "id": "pearl-mini",
+      "name": "Pearl Mini",
+      "category": "encoder",
+      "tagline": "Compact all-in-one for classrooms and small venues",
+      "use_cases": ["lecture capture", "classroom recording", "small meeting rooms", "houses of worship"],
+      "key_features": ["2 video inputs (HDMI)", "full HD recording + streaming", "touchscreen", "SSD option for local recording", "Epiphan Cloud"],
+      "competitors": ["Extron SMP 111", "Panopto appliance", "Crestron AirMedia"],
+      "products": [
+        {"name": "Pearl Mini w/SSD", "sku": "pearl-mini-ssd", "price_usd": 3999, "note": "Built-in SSD for local recording"},
+        {"name": "Pearl Mini", "sku": "pearl-mini", "price_usd": 3750, "note": "Base model, streams only or records to USB/network"}
+      ]
+    },
+    {
+      "id": "pearl-nexus",
+      "name": "Pearl Nexus",
+      "category": "encoder",
+      "tagline": "Software-defined encoder for NDI and IP workflows",
+      "use_cases": ["NDI production", "AV-over-IP", "campus-wide capture", "distributed streaming"],
+      "key_features": ["NDI input/output", "SRT/RTMP/RTSP streaming", "software-defined channels", "fleet management via Cloud", "no physical video inputs (IP only)"],
+      "competitors": ["NewTek Spark", "Kiloview encoders", "Magewell Ultra Stream"],
+      "products": [
+        {"name": "Pearl Nexus", "sku": "pearl-nexus", "price_usd": 3299, "note": "IP-only encoder, ideal for NDI environments"}
+      ]
+    },
+    {
+      "id": "pearl-nano",
+      "name": "Pearl Nano",
+      "category": "encoder",
+      "tagline": "Ultra-compact single-input encoder",
+      "use_cases": ["single-camera lecture capture", "event streaming", "small rooms", "portable streaming"],
+      "key_features": ["1 HDMI input", "full HD streaming + recording", "palm-sized", "SSD option", "Epiphan Cloud", "lowest entry price"],
+      "competitors": ["Magewell Ultra Stream HDMI", "LiveU Solo", "Blackmagic Web Presenter"],
+      "products": [
+        {"name": "Pearl Nano w/SSD", "sku": "pearl-nano-ssd", "price_usd": 2249, "note": "Built-in SSD"},
+        {"name": "Pearl Nano", "sku": "pearl-nano", "price_usd": 1999, "note": "Base model"}
+      ]
+    },
+    {
+      "id": "ec20",
+      "name": "EC20 PTZ Camera",
+      "category": "camera",
+      "tagline": "Auto-tracking PTZ camera designed for Pearl ecosystem",
+      "use_cases": ["lecture capture", "meeting rooms", "houses of worship", "event coverage"],
+      "key_features": ["auto-tracking", "20x optical zoom", "NDI|HX", "HDMI + USB output", "pairs with Pearl encoders"],
+      "competitors": ["PTZOptics", "AVer", "Logitech Rally"],
+      "products": [
+        {"name": "EC20 PTZ Camera", "sku": "ec20", "price_usd": 1899, "note": "Auto-tracking PTZ, pairs with Pearl"}
+      ]
+    },
+    {
+      "id": "bundles",
+      "name": "Production Bundles",
+      "category": "bundle",
+      "tagline": "Pearl + EC20 camera bundles for turnkey deployments",
+      "use_cases": ["turnkey classroom", "quick-deploy production", "standardized AV"],
+      "key_features": ["encoder + camera(s) in one SKU", "volume pricing", "simplified procurement"],
+      "competitors": ["Crestron room kits", "Poly Studio", "Yealink MeetingBar"],
+      "products": [
+        {"name": "Prod Plus Pearl-2 + 3 EC20", "sku": "bundle-p2-3cam", "price_usd": 12279, "note": "Flagship 3-camera bundle"},
+        {"name": "Prod Essential Pearl-2 + 2 EC20", "sku": "bundle-p2-2cam", "price_usd": 10849, "note": "2-camera bundle"},
+        {"name": "Prod Starter Pearl-2 + 1 EC20", "sku": "bundle-p2-1cam", "price_usd": 9429, "note": "Single camera bundle"},
+        {"name": "Studio Plus Mini + 2 EC20", "sku": "bundle-mini-2cam", "price_usd": 6599, "note": "Mini 2-camera"},
+        {"name": "Lect Cap Plus Nexus + 2 EC20", "sku": "bundle-nexus-2cam", "price_usd": 6149, "note": "Nexus 2-camera lecture capture"},
+        {"name": "Studio Essential Mini + 1 EC20", "sku": "bundle-mini-1cam", "price_usd": 5179, "note": "Mini single camera"},
+        {"name": "Lect Cap Essential Nexus + 1 EC20", "sku": "bundle-nexus-1cam", "price_usd": 4729, "note": "Nexus single camera"},
+        {"name": "Event Streaming Nano + 1 EC20", "sku": "bundle-nano-1cam", "price_usd": 3419, "note": "Compact event kit"}
+      ]
+    },
+    {
+      "id": "avio",
+      "name": "AV.io",
+      "category": "capture_card",
+      "tagline": "USB video capture grabbers for any laptop/PC",
+      "use_cases": ["software-based capture", "bring-your-own-device", "portable recording", "telehealth"],
+      "key_features": ["USB 3.0 plug-and-play", "no driver install", "UVC compliant", "works with any software (Zoom, Teams, OBS)"],
+      "competitors": ["Magewell USB Capture", "Elgato Cam Link", "Blackmagic UltraStudio"],
+      "products": [
+        {"name": "AV.io 4K", "sku": "avio-4k", "price_usd": 579.95, "note": "4K HDMI capture"},
+        {"name": "AV.io SDI+", "sku": "avio-sdi-plus", "price_usd": 579.95, "note": "3G-SDI capture, updated model"},
+        {"name": "AV.io SDI", "sku": "avio-sdi", "price_usd": 579.95, "note": "SDI capture"},
+        {"name": "AV.io HD+", "sku": "avio-hd-plus", "price_usd": 449.95, "note": "1080p HDMI, updated model"},
+        {"name": "AV.io HD", "sku": "avio-hd", "price_usd": 449.95, "note": "1080p HDMI capture"}
+      ]
+    },
+    {
+      "id": "cloud-edge",
+      "name": "Epiphan Cloud & Edge",
+      "category": "cloud_service",
+      "tagline": "Cloud management and analytics platform for Pearl fleet",
+      "use_cases": ["fleet management", "remote monitoring", "scheduled recording", "centralized control"],
+      "key_features": ["remote device management", "scheduled recordings", "analytics dashboard", "firmware updates", "user access control"],
+      "competitors": ["Panopto", "Kaltura", "Extron GlobalViewer"],
+      "products": [
+        {"name": "Edge PRO Unlimited Annual", "sku": "edge-pro-unlimited-yr", "price_usd": 10380, "note": "Unlimited devices, annual"},
+        {"name": "Edge PRO 30 Annual", "sku": "edge-pro-30-yr", "price_usd": 5820, "note": "Up to 30 devices, annual"},
+        {"name": "Edge PRO 10 Annual", "sku": "edge-pro-10-yr", "price_usd": 2100, "note": "Up to 10 devices, annual"},
+        {"name": "Edge Device License Annual", "sku": "edge-device-yr", "price_usd": 240, "note": "Per-device annual license"},
+        {"name": "Edge Device License Monthly", "sku": "edge-device-mo", "price_usd": 25, "note": "Per-device monthly"}
+      ]
+    },
+    {
+      "id": "livescrypt",
+      "name": "LiveScrypt",
+      "category": "software",
+      "tagline": "Real-time transcription and captioning appliance",
+      "use_cases": ["live captioning", "accessibility compliance", "lecture transcription", "event captioning"],
+      "key_features": ["real-time speech-to-text", "multi-language", "ADA/AODA compliance", "standalone appliance"],
+      "competitors": ["Rev.ai", "Otter.ai", "VITAC"],
+      "products": [
+        {"name": "LiveScrypt", "sku": "livescrypt", "price_usd": 1499.95, "note": "Hardware captioning appliance"},
+        {"name": "LiveScrypt Service", "sku": "livescrypt-svc", "price_usd": 9.95, "note": "Monthly transcription service"}
+      ]
+    },
+    {
+      "id": "dvi2pcie",
+      "name": "DVI2PCIe Duo",
+      "category": "capture_card",
+      "tagline": "Internal PCIe capture card for OEM and custom builds",
+      "use_cases": ["OEM integration", "medical imaging", "industrial vision", "KVM applications"],
+      "key_features": ["PCIe x4", "dual-channel DVI/HDMI capture", "low latency", "SDK available"],
+      "competitors": ["Datapath VisionRGB", "Magewell Pro Capture"],
+      "products": [
+        {"name": "DVI2PCIe Duo", "sku": "dvi2pcie-duo", "price_usd": 1399.95, "note": "Dual-input internal capture card"}
+      ]
+    }
+  ]
+}
