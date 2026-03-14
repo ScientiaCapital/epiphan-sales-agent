@@ -1,8 +1,8 @@
 # Project Context: epiphan-sales-agent
 
-**Updated:** 2026-02-22
+**Updated:** 2026-03-14
 **Branch:** main
-**Tech Stack:** Python 3.12, FastAPI, LangGraph, Supabase, Railway
+**Tech Stack:** Python 3.12, FastAPI, LangGraph 1.1.2, Supabase, Railway
 
 ---
 
@@ -14,11 +14,9 @@
 ## Recent Commits
 
 ```
-49b5f95 fix(security): Separate API key from JWT secret + startup validation + mypy cleanup
-0d98613 feat(infra): Deploy to Railway + Supabase production
-aad9371 chore(infra): update gitignore and lock files
-0fb77a1 chore(infra): add dual-team observer workflow infrastructure
-9018314 chore: End-of-day doc sync — mark session complete, update backlog
+ef7fafe feat: structured output for competitor/script agents + coaching session state
+cb5fc64 refactor: replace manual LLM parsing with with_structured_output()
+9985931 feat: port Souffleur coaching intelligence layer (core types)
 ```
 
 ## Working Tree Status
@@ -27,16 +25,30 @@ aad9371 chore(infra): update gitignore and lock files
 Clean (all committed and pushed)
 ```
 
-## Done (This Session — 2026-02-22 Session 2)
-- Separated EPIPHAN_API_KEY from JWT_SECRET_KEY (security fix R1)
-- Added _validate_production_secrets() startup guard (security fix R2)
-- Resolved all 55 mypy errors (cast() at Supabase boundary)
-- Set EPIPHAN_API_KEY in Railway production
-- 9 new tests (1343 total), 0 mypy, 0 ruff
+## Done (This Session — 2026-03-14)
+
+### Session 1: Souffleur Intelligence Port
+- Ported coaching intelligence layer from Rust: MEDDIC, DISC, Call Stage FSM, product catalog, context builder, state machine + 6 invariant rules
+- Bumped LangChain ecosystem deps (langgraph 1.1.2, langsmith 0.7.17)
+- 2x /simplify passes: 10 issues fixed
+- Full codebase audit (8/10) + Souffleur architecture review
+
+### Session 2: Structured Output + Coaching Wiring
+- **All 4 agents now use `with_structured_output()`** — zero manual LLM parsing remaining
+  - Email agent: `EmailResponse` model
+  - Qualification agent: `TierDecision` model
+  - Competitor intel: `CompetitorResponseOutput` model (with fallback error handling)
+  - Script selection: `ScriptResponseOutput` model
+- **Coaching fields wired into CallSessionState**: call_stage, accumulated_state, audience, coaching_history (typed as CoachingResponse), topics_discussed, turn_count
+- **SessionStateResponse** now returns live coaching state (call_stage, meddic_score, turn_count)
+- DA agent review: 2 HIGH + 4 MEDIUM findings resolved
+- 1465 tests, 0 mypy errors, 0 ruff errors
 
 ## Tomorrow
 
-Tomorrow: Build monitoring dashboard UI (frontend) via feature-build | STANDARD scope | Est: 4h, $5-8 | Observer notes: [R3] service_key for all ops, [S1-S2] in-memory limits/sessions need Redis for scale
+1. **Replace Cerebras with OpenRouter** — dynamic model routing via orchestrator for best tool use support per task (Tim's decision: no more Cerebras)
+2. **Coaching LangGraph agent (7th agent)** — uses coaching schemas + state machine + context builder, Claude-powered
+3. **Call brief coaching context** — wire coaching into call brief assembler as 5th parallel call
 
 ---
 
