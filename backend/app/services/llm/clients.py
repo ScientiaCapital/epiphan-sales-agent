@@ -2,8 +2,8 @@
 
 Routes to appropriate model based on task:
 - Claude: personalization, synthesis, generation, research (quality)
-- Cerebras/DeepSeek: lookup, fast tasks (speed)
-- OpenRouter: fallback for all
+- OpenRouter fast (DeepSeek): lookup, fast tasks (speed, reliable tool use)
+- OpenRouter (Claude 3.5 Sonnet): fallback for all
 """
 
 from functools import lru_cache
@@ -24,7 +24,7 @@ class LLMRouter:
         """Initialize all LLM clients."""
         self._claude: ChatAnthropic | None = None
         self._claude_thinking: ChatAnthropic | None = None
-        self._cerebras: ChatOpenAI | None = None
+        self._openrouter_fast: ChatOpenAI | None = None
         self._deepseek: ChatOpenAI | None = None
         self._openrouter: ChatOpenAI | None = None
 
@@ -67,20 +67,20 @@ class LLMRouter:
         return self._claude_thinking
 
     @property
-    def cerebras(self) -> ChatOpenAI:
-        """Lazy-load Cerebras client."""
-        if self._cerebras is None:
-            self._cerebras = ChatOpenAI(
-                base_url=settings.cerebras_api_base,
-                api_key=settings.cerebras_api_key,
-                model="llama-3.3-70b",
+    def openrouter_fast(self) -> ChatOpenAI:
+        """Fast tier via OpenRouter — DeepSeek V3 for speed + reliable tool use."""
+        if self._openrouter_fast is None:
+            self._openrouter_fast = ChatOpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=settings.openrouter_api_key,
+                model="deepseek/deepseek-chat-v3-0324",
                 max_tokens=2048,
             )
-        return self._cerebras
+        return self._openrouter_fast
 
     @property
     def deepseek(self) -> ChatOpenAI:
-        """Lazy-load DeepSeek client."""
+        """Lazy-load DeepSeek client (direct API)."""
         if self._deepseek is None:
             self._deepseek = ChatOpenAI(
                 base_url="https://api.deepseek.com/v1",
@@ -92,7 +92,7 @@ class LLMRouter:
 
     @property
     def openrouter(self) -> ChatOpenAI:
-        """Lazy-load OpenRouter client (fallback)."""
+        """Lazy-load OpenRouter client (fallback — Claude 3.5 Sonnet)."""
         if self._openrouter is None:
             self._openrouter = ChatOpenAI(
                 base_url="https://openrouter.ai/api/v1",
@@ -123,7 +123,7 @@ class LLMRouter:
         if task in self.QUALITY_TASKS:
             return self.claude
 
-        return self.cerebras
+        return self.openrouter_fast
 
 
 @lru_cache

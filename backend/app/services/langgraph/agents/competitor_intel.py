@@ -1,7 +1,7 @@
 """Competitor Intelligence Agent.
 
 Provides real-time battlecard responses during sales calls.
-Uses fast LLM (Cerebras/DeepSeek) for <2s response time.
+Uses fast LLM (OpenRouter/DeepSeek V3) for <2s response time.
 """
 
 from typing import Any, cast

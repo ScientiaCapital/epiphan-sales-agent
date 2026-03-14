@@ -13,6 +13,14 @@ from typing import Annotated, Any, TypedDict
 
 from pydantic import BaseModel, Field
 
+from app.data.coaching_schemas import (
+    AccumulatedState,
+    AudienceType,
+    CallStage,
+    CoachingResponse,
+    CrossCallContext,
+    CurrentState,
+)
 from app.data.lead_schemas import Lead
 
 
@@ -406,3 +414,44 @@ class OrchestratorOutput(TypedDict):
     email_result: dict[str, Any] | None
     hubspot_sync_result: dict[str, Any] | None
     errors: Annotated[list[str], add]  # Appends instead of overwrites
+
+
+# =============================================================================
+# Coaching Agent State
+# =============================================================================
+
+
+class CoachingAgentState(TypedDict):
+    """State for Coaching Agent (7th agent).
+
+    Flow: build_context → analyze_turn → generate_coaching → validate_state
+    """
+
+    # Inputs
+    transcript: str
+    call_stage: CallStage
+    accumulated_state: AccumulatedState
+    audience: AudienceType
+    topics: list[str]
+    objections: list[str]
+    cross_call: CrossCallContext | None
+
+    # Intermediate
+    system_prompt: str
+    current_state: CurrentState | None
+
+    # Outputs
+    coaching: CoachingResponse | None
+    updated_accumulated: AccumulatedState | None
+    invariant_violations: list[str]
+
+
+class CoachingBrief(BaseModel):
+    """Coaching context for call briefs — cross-call intelligence summary."""
+
+    meddic_score: int = 0
+    meddic_gaps: list[str] = Field(default_factory=list)
+    disc_profile: str | None = None
+    prior_objections: list[str] = Field(default_factory=list)
+    last_stage_reached: str | None = None
+    total_prior_calls: int = 0

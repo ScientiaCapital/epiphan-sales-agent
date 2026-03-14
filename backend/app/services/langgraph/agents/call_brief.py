@@ -15,7 +15,7 @@ import contextlib
 import logging
 import time
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, Field
 
@@ -30,7 +30,7 @@ from app.data.stories import get_best_reference_for_context
 from app.services.langgraph.agents.lead_research import LeadResearchAgent
 from app.services.langgraph.agents.qualification import QualificationAgent
 from app.services.langgraph.agents.script_selection import ScriptSelectionAgent
-from app.services.langgraph.states import QualificationTier
+from app.services.langgraph.states import CoachingBrief, QualificationTier
 from app.services.langgraph.tools.harvester_mapper import enrich_phone_numbers
 
 logger = logging.getLogger(__name__)
@@ -204,6 +204,7 @@ class CallBriefResponse(BaseModel):
     discovery_prep: DiscoveryPrep
     competitor_prep: CompetitorPrep
     reference_story: ReferenceStoryBrief
+    coaching_context: CoachingBrief | None = None
 
     # Meta
     brief_quality: BriefQuality = BriefQuality.MEDIUM
@@ -240,8 +241,8 @@ class CallBriefAssembler:
         start_time = time.monotonic()
         lead = request.lead
 
-        # Run all agents in parallel (research, qualify, script, user context)
-        research_result, qualification_result, script_result, user_context = await self._run_agents(
+        # Run all agents in parallel (research, qualify, script, user context, coaching context)
+        research_result, qualification_result, script_result, user_context, coaching_ctx = await self._run_agents(
             lead=lead,
             trigger=request.trigger,
             call_type=request.call_type,
@@ -290,6 +291,21 @@ class CallBriefAssembler:
                             )
                         )
 
+        # Enrich with coaching context if available
+        if coaching_ctx:
+            # Add unresolved objections from prior calls to objection prep
+            for obj_text in coaching_ctx.prior_objections:
+                if obj_text and not any(
+                    o.objection == obj_text for o in objection_prep.objections
+                ):
+                    objection_prep.objections.append(
+                        ObjectionPrepItem(
+                            objection=obj_text,
+                            response="Unresolved from prior call — prepare response",
+                            persona_context="from_coaching_context",
+                        )
+                    )
+
         elapsed_ms = (time.monotonic() - start_time) * 1000
 
         return CallBriefResponse(
@@ -301,6 +317,7 @@ class CallBriefAssembler:
             discovery_prep=discovery_prep,
             competitor_prep=competitor_prep,
             reference_story=reference_story,
+            coaching_context=coaching_ctx,
             brief_quality=brief_quality,
             intelligence_gaps=intelligence_gaps,
             processing_time_ms=round(elapsed_ms, 1),
@@ -314,8 +331,8 @@ class CallBriefAssembler:
         trigger: str | None,
         call_type: str,
         research_depth: str,
-    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None]:
-        """Run research, qualification, script agents, and user context in parallel.
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None, CoachingBrief | None]:
+        """Run research, qualification, script, user context, and coaching context in parallel.
 
         Each agent failure is isolated — returns None for that result,
         allowing the brief to degrade gracefully.
@@ -372,13 +389,59 @@ class CallBriefAssembler:
                 logger.exception("User memory failed for %s", lead.email)
                 return None
 
-        results: tuple[dict[str, Any] | None, ...] = await asyncio.gather(
+        async def _safe_coaching_context() -> CoachingBrief | None:
+            try:
+                from app.data.coaching_schemas import CallHistoryEntry
+                from app.services.coaching.state_machine import build_cross_call_context
+                from app.services.database.supabase_client import supabase_client
+
+                lead_id = lead.hubspot_id or lead.email
+
+                response = supabase_client.client.table("call_outcomes").select(
+                    "id, created_at, duration_seconds, stage_reached, summary, key_topics"
+                ).eq("lead_id", lead_id).order(
+                    "created_at", desc=True
+                ).limit(10).execute()
+
+                if not response.data:
+                    return None
+
+                rows = cast(list[dict[str, Any]], response.data)
+                history = [
+                    CallHistoryEntry(
+                        id=str(row.get("id", "")),
+                        date=str(row.get("created_at", "")),
+                        duration=row.get("duration_seconds"),
+                        stage_reached=row.get("stage_reached"),
+                        summary=row.get("summary"),
+                        key_topics=row.get("key_topics"),
+                    )
+                    for row in rows
+                ]
+
+                cross_call = build_cross_call_context(history)
+
+                return CoachingBrief(
+                    meddic_score=0,  # No accumulated state from prior calls yet
+                    meddic_gaps=["Metrics", "Economic Buyer", "Decision Criteria",
+                                 "Decision Process", "Pain", "Champion"],
+                    disc_profile=None,
+                    prior_objections=cross_call.unresolved_objections,
+                    last_stage_reached=cross_call.last_stage_reached,
+                    total_prior_calls=cross_call.total_previous_calls,
+                )
+            except Exception:
+                logger.exception("Coaching context failed for %s", lead.email)
+                return None
+
+        results: tuple[Any, ...] = await asyncio.gather(
             _safe_research(),
             _safe_qualify(),
             _safe_script(),
             _safe_user_context(),
+            _safe_coaching_context(),
         )
-        return results[0], results[1], results[2], results[3]
+        return results[0], results[1], results[2], results[3], results[4]
 
     def _get_persona_id(
         self,

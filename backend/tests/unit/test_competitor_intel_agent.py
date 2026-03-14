@@ -1,6 +1,6 @@
 """Tests for Competitor Intelligence Agent."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
