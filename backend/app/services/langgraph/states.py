@@ -68,6 +68,32 @@ class EmailResponse(BaseModel):
     )
 
 
+class CompetitorResponseOutput(BaseModel):
+    """Structured response from competitor intel LLM call.
+
+    Replaces manual "FOLLOW_UP:" delimiter parsing with type-safe output.
+    """
+
+    response: str = Field(
+        description="Concise 2-3 sentence response addressing the competitor concern"
+    )
+    follow_up_question: str | None = Field(
+        default=None,
+        description="Discovery question to keep the conversation going",
+    )
+
+
+class ScriptResponseOutput(BaseModel):
+    """Structured response from script personalization LLM call.
+
+    Ensures clean script text without prompt artifacts.
+    """
+
+    personalized_script: str = Field(
+        description="The personalized call script, ready to read aloud"
+    )
+
+
 class DimensionScore(TypedDict):
     """Score breakdown for a single ICP dimension."""
 

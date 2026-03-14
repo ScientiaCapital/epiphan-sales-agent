@@ -14,6 +14,13 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.data.coaching_schemas import (
+    AccumulatedState,
+    AudienceType,
+    CallStage,
+    CoachingResponse,
+)
+
 # =============================================================================
 # Enums
 # =============================================================================
@@ -147,6 +154,24 @@ class CallSessionState(BaseModel):
     competitors_mentioned: list[str] = Field(default_factory=list)
     persona_id: str | None = None
 
+    # Coaching intelligence state (from Souffleur port)
+    call_stage: CallStage = Field(default=CallStage.OPENING, description="Current FSM stage")
+    max_stage_level: int = Field(default=0, description="Watermark — highest stage level reached")
+    accumulated_state: AccumulatedState = Field(
+        default_factory=AccumulatedState,
+        description="Monotonic MEDDIC/DISC tracking across turns",
+    )
+    audience: AudienceType = Field(
+        default=AudienceType.DIRECT_SALE,
+        description="Direct sale vs channel partner — determines MEDDIC vs PartnerProgress",
+    )
+    coaching_history: list[CoachingResponse] = Field(
+        default_factory=list,
+        description="Coaching tips shown this call (for context/dedup)",
+    )
+    topics_discussed: list[str] = Field(default_factory=list)
+    turn_count: int = Field(default=0, description="Conversation turn counter")
+
 
 # =============================================================================
 # REST Request/Response Models
@@ -203,3 +228,6 @@ class SessionStateResponse(BaseModel):
     objections_raised: list[str]
     competitors_mentioned: list[str]
     persona_id: str | None = None
+    call_stage: str | None = None
+    meddic_score: int = 0
+    turn_count: int = 0

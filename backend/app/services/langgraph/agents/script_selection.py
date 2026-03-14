@@ -4,10 +4,10 @@ Personalizes warm and cold call scripts based on lead context.
 Uses Claude for high-quality personalization.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from app.data.lead_schemas import Lead
-from app.services.langgraph.states import ScriptSelectionState
+from app.services.langgraph.states import ScriptResponseOutput, ScriptSelectionState
 from app.services.langgraph.tools.script_tools import (
     get_cold_script,
     get_persona_profile,
@@ -181,17 +181,18 @@ class ScriptSelectionAgent:
         self,
         state: ScriptSelectionState,
     ) -> dict[str, Any]:
-        """Personalize script using LLM."""
+        """Personalize script using LLM with structured output."""
         if not state["base_script"]:
             return {
                 "personalized_script": "No script template available for this combination.",
             }
 
         prompt = self._build_prompt(state)
-        response = await self.llm.ainvoke(prompt)
+        structured_llm = self.llm.with_structured_output(ScriptResponseOutput)
+        result = cast(ScriptResponseOutput, await structured_llm.ainvoke(prompt))
 
         return {
-            "personalized_script": response.content,
+            "personalized_script": result.personalized_script,
         }
 
     def _build_prompt(self, state: ScriptSelectionState) -> str:

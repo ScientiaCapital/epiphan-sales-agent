@@ -383,4 +383,7 @@ async def get_session(
         objections_raised=session.objections_raised,
         competitors_mentioned=session.competitors_mentioned,
         persona_id=session.persona_id,
+        call_stage=session.call_stage.value,
+        meddic_score=session.accumulated_state.meddic.score(),
+        turn_count=session.turn_count,
     )

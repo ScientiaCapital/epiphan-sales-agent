@@ -4,11 +4,11 @@ Provides real-time battlecard responses during sales calls.
 Uses fast LLM (Cerebras/DeepSeek) for <2s response time.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from langchain_core.tools import ToolException
 
-from app.services.langgraph.states import CompetitorIntelState
+from app.services.langgraph.states import CompetitorIntelState, CompetitorResponseOutput
 from app.services.langgraph.tools.competitor_tools import (
     get_battlecard,
     get_claim_responses,
@@ -156,31 +156,33 @@ class CompetitorIntelAgent:
         self,
         state: CompetitorIntelState,
     ) -> dict[str, Any]:
-        """Generate response using LLM."""
+        """Generate response using LLM with structured output."""
         if not state["battlecard"]:
             return {
                 "response": f"I don't have specific battlecard data for {state['competitor_name']}. Let me get back to you with details.",
                 "follow_up_question": "Can you tell me more about what they're offering?",
             }
 
-        # Build prompt
         prompt = self._build_prompt(state)
 
-        # Call LLM
-        response = await self.llm.ainvoke(prompt)
-        response_text = str(response.content) if response.content else ""
-
-        # Extract follow-up if present
-        follow_up = None
-        if "FOLLOW_UP:" in response_text:
-            parts = response_text.split("FOLLOW_UP:")
-            response_text = parts[0].strip()
-            follow_up = parts[1].strip() if len(parts) > 1 else None
-
-        return {
-            "response": response_text,
-            "follow_up_question": follow_up,
-        }
+        try:
+            structured_llm = self.llm.with_structured_output(
+                CompetitorResponseOutput,
+            )
+            result = cast(
+                CompetitorResponseOutput, await structured_llm.ainvoke(prompt)
+            )
+            return {
+                "response": result.response,
+                "follow_up_question": result.follow_up_question,
+            }
+        except Exception:
+            # Fallback: raw LLM call if structured output fails (e.g., Cerebras)
+            response = await self.llm.ainvoke(prompt)
+            return {
+                "response": str(response.content) if response.content else "",
+                "follow_up_question": None,
+            }
 
     def _build_prompt(self, state: CompetitorIntelState) -> str:
         """Build prompt for LLM."""
@@ -218,9 +220,7 @@ QUERY TYPE: {state['query_type']}
 
 Generate a concise, confident response (2-3 sentences max) that addresses their concern.
 Focus on value, not bashing the competitor.
-End with FOLLOW_UP: and a discovery question to keep the conversation going.
-
-RESPONSE:"""
+Include a discovery question to keep the conversation going."""
 
 
 # Singleton instance
