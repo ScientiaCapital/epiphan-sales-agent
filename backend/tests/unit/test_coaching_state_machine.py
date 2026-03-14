@@ -1,6 +1,5 @@
 """Tests for coaching state machine — FSM transitions, state updates, invariants."""
 
-import pytest
 
 from app.data.coaching_schemas import (
     AccumulatedState,
@@ -9,7 +8,6 @@ from app.data.coaching_schemas import (
     CallHistoryEntry,
     CallStage,
     CoachingResponse,
-    CoachingType,
     CurrentState,
     DiscConfidence,
     DiscType,
@@ -25,7 +23,6 @@ from app.services.coaching.state_machine import (
     build_cross_call_context,
     update_accumulated_state,
 )
-
 
 # =============================================================================
 # update_accumulated_state

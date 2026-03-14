@@ -1,9 +1,7 @@
 """Tests for product catalog — loading, search, and prompt formatting."""
 
-import pytest
 
-from app.data.product_catalog import ProductCatalog, product_catalog
-
+from app.data.product_catalog import product_catalog
 
 # =============================================================================
 # Loading

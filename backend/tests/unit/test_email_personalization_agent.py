@@ -1,11 +1,11 @@
 """Tests for Email Personalization Agent."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.data.lead_schemas import Lead
-from app.services.langgraph.states import ResearchBrief
+from app.services.langgraph.states import EmailResponse, ResearchBrief
 
 
 class TestEmailPersonalizationAgent:
@@ -48,6 +48,23 @@ class TestEmailPersonalizationAgent:
             "pain_points": ["Manual recording", "Inconsistent quality"],
         }
 
+    def _mock_structured_llm(
+        self, agent: object, response: EmailResponse
+    ) -> MagicMock:
+        """Set up mock for with_structured_output() chain.
+
+        Returns the mock_llm so callers can make assertions on it.
+        """
+        mock_structured = MagicMock()
+        mock_structured.ainvoke = AsyncMock(return_value=response)
+
+        mock_llm = MagicMock()
+        mock_llm.with_structured_output.return_value = mock_structured
+
+        # Patch the agent's _llm attribute
+        object.__setattr__(agent, "_llm", mock_llm)
+        return mock_llm
+
     def test_agent_initializes(self):
         """Test that agent initializes."""
         from app.services.langgraph.agents.email_personalization import (
@@ -71,31 +88,28 @@ class TestEmailPersonalizationAgent:
 
         agent = EmailPersonalizationAgent()
 
-        # Mock LLM response
-        mock_llm_response = MagicMock()
-        mock_llm_response.content = """Subject: Quick question about State University's AV setup
+        email_response = EmailResponse(
+            subject_line="Quick question about State University's AV setup",
+            email_body=(
+                "Hi Sarah,\n\n"
+                "I noticed State University is expanding online learning - that's exciting! "
+                "Many AV Directors I work with have found that scaling lecture capture "
+                "becomes a challenge during expansion phases.\n\n"
+                "Would a 15-minute call be worth your time to explore how Epiphan "
+                "helps institutions like yours?\n\n"
+                "Best,"
+            ),
+        )
 
-Hi Sarah,
+        self._mock_structured_llm(agent, email_response)
 
-I noticed State University is expanding online learning - that's exciting! Many AV Directors I work with have found that scaling lecture capture becomes a challenge during expansion phases.
-
-Would a 15-minute call be worth your time to explore how Epiphan helps institutions like yours?
-
-Best,
-[Name]"""
-
-        with patch.object(
-            agent, "_llm", new_callable=MagicMock
-        ) as mock_llm:
-            mock_llm.ainvoke = AsyncMock(return_value=mock_llm_response)
-
-            result = await agent.run(
-                lead=sample_lead,
-                research_brief=sample_brief,
-                persona=sample_persona,
-                email_type="pattern_interrupt",
-                sequence_step=1,
-            )
+        result = await agent.run(
+            lead=sample_lead,
+            research_brief=sample_brief,
+            persona=sample_persona,
+            email_type="pattern_interrupt",
+            sequence_step=1,
+        )
 
         assert result is not None
         assert "subject_line" in result
@@ -117,35 +131,34 @@ Best,
 
         agent = EmailPersonalizationAgent()
 
-        mock_response_1 = MagicMock()
-        mock_response_1.content = "Subject: Test 1\n\nBody 1"
+        response_1 = EmailResponse(subject_line="Test 1", email_body="Body 1")
+        response_2 = EmailResponse(subject_line="Test 2", email_body="Body 2")
 
-        mock_response_2 = MagicMock()
-        mock_response_2.content = "Subject: Test 2\n\nBody 2"
+        mock_structured = MagicMock()
+        mock_structured.ainvoke = AsyncMock(side_effect=[response_1, response_2])
 
-        with patch.object(
-            agent, "_llm", new_callable=MagicMock
-        ) as mock_llm:
-            mock_llm.ainvoke = AsyncMock(side_effect=[mock_response_1, mock_response_2])
+        mock_llm = MagicMock()
+        mock_llm.with_structured_output.return_value = mock_structured
+        object.__setattr__(agent, "_llm", mock_llm)
 
-            await agent.run(
-                lead=sample_lead,
-                research_brief=sample_brief,
-                persona=sample_persona,
-                email_type="pattern_interrupt",
-                sequence_step=1,
-            )
+        await agent.run(
+            lead=sample_lead,
+            research_brief=sample_brief,
+            persona=sample_persona,
+            email_type="pattern_interrupt",
+            sequence_step=1,
+        )
 
-            await agent.run(
-                lead=sample_lead,
-                research_brief=sample_brief,
-                persona=sample_persona,
-                email_type="breakup",
-                sequence_step=3,
-            )
+        await agent.run(
+            lead=sample_lead,
+            research_brief=sample_brief,
+            persona=sample_persona,
+            email_type="breakup",
+            sequence_step=3,
+        )
 
         # Different email types should produce different calls
-        assert mock_llm.ainvoke.call_count == 2
+        assert mock_structured.ainvoke.call_count == 2
 
     @pytest.mark.asyncio
     async def test_handles_missing_research_brief(
@@ -160,21 +173,19 @@ Best,
 
         agent = EmailPersonalizationAgent()
 
-        mock_response = MagicMock()
-        mock_response.content = "Subject: Intro\n\nHi Sarah, wanted to connect."
+        email_response = EmailResponse(
+            subject_line="Intro",
+            email_body="Hi Sarah, wanted to connect.",
+        )
+        self._mock_structured_llm(agent, email_response)
 
-        with patch.object(
-            agent, "_llm", new_callable=MagicMock
-        ) as mock_llm:
-            mock_llm.ainvoke = AsyncMock(return_value=mock_response)
-
-            result = await agent.run(
-                lead=sample_lead,
-                research_brief=None,
-                persona=sample_persona,
-                email_type="pattern_interrupt",
-                sequence_step=1,
-            )
+        result = await agent.run(
+            lead=sample_lead,
+            research_brief=None,
+            persona=sample_persona,
+            email_type="pattern_interrupt",
+            sequence_step=1,
+        )
 
         assert result is not None
         assert "subject_line" in result
@@ -193,27 +204,23 @@ Best,
 
         agent = EmailPersonalizationAgent()
 
-        mock_response = MagicMock()
-        mock_response.content = """Subject: This is the subject line
+        email_response = EmailResponse(
+            subject_line="This is the subject line",
+            email_body=(
+                "This is the first paragraph of the body.\n\n"
+                "This is the second paragraph.\n\n"
+                "Best regards"
+            ),
+        )
+        self._mock_structured_llm(agent, email_response)
 
-This is the first paragraph of the body.
-
-This is the second paragraph.
-
-Best regards"""
-
-        with patch.object(
-            agent, "_llm", new_callable=MagicMock
-        ) as mock_llm:
-            mock_llm.ainvoke = AsyncMock(return_value=mock_response)
-
-            result = await agent.run(
-                lead=sample_lead,
-                research_brief=sample_brief,
-                persona=sample_persona,
-                email_type="pain_point",
-                sequence_step=2,
-            )
+        result = await agent.run(
+            lead=sample_lead,
+            research_brief=sample_brief,
+            persona=sample_persona,
+            email_type="pain_point",
+            sequence_step=2,
+        )
 
         assert result["subject_line"] == "This is the subject line"
         assert "first paragraph" in result["email_body"]
@@ -232,22 +239,37 @@ Best regards"""
 
         agent = EmailPersonalizationAgent()
 
-        mock_response = MagicMock()
-        mock_response.content = "Subject: Test\n\nBody"
+        email_response = EmailResponse(
+            subject_line="Test",
+            email_body="Body",
+        )
+        mock_llm = self._mock_structured_llm(agent, email_response)
 
-        with patch.object(
-            agent, "_llm", new_callable=MagicMock
-        ) as mock_llm:
-            mock_llm.ainvoke = AsyncMock(return_value=mock_response)
+        await agent.run(
+            lead=sample_lead,
+            research_brief=sample_brief,
+            persona=sample_persona,
+            email_type="pain_point",
+            sequence_step=2,
+        )
 
-            await agent.run(
-                lead=sample_lead,
-                research_brief=sample_brief,
-                persona=sample_persona,
-                email_type="pain_point",
-                sequence_step=2,
-            )
+        # Verify LLM was called (via structured output chain)
+        assert mock_llm.with_structured_output.called
 
-            # Check the prompt included persona pain points
-            # The prompt should be constructed (we verify through the call)
-            assert mock_llm.ainvoke.called
+
+class TestEmailResponseModel:
+    """Tests for the EmailResponse structured output model."""
+
+    def test_email_response_creation(self):
+        """Test EmailResponse model can be created."""
+        resp = EmailResponse(
+            subject_line="Test subject",
+            email_body="Test body",
+        )
+        assert resp.subject_line == "Test subject"
+        assert resp.email_body == "Test body"
+
+    def test_email_response_requires_fields(self):
+        """Test EmailResponse requires both fields."""
+        with pytest.raises(ValueError):
+            EmailResponse()  # type: ignore[call-arg]

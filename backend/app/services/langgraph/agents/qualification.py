@@ -32,6 +32,7 @@ from app.services.langgraph.states import (
     ICPScoreBreakdown,
     QualificationState,
     QualificationTier,
+    TierDecision,
 )
 from app.services.langgraph.tools.qualification_tools import (
     WEIGHT_BUYING_AUTHORITY,
@@ -321,7 +322,8 @@ class QualificationAgent:
         Use extended thinking model for nuanced tier decision on edge cases.
 
         Extended thinking gives Claude a reasoning scratchpad to work through
-        ambiguous signals before making a final determination.
+        ambiguous signals before making a final determination. Uses
+        with_structured_output() for reliable tier extraction.
 
         Args:
             lead: The lead being qualified
@@ -348,10 +350,7 @@ Tier definitions:
 - Tier 1 (70+): Priority sequence, AE involvement early - strong fit
 - Tier 2 (50-69): Standard sequence - good fit with some gaps
 - Tier 3 (30-49): Light touch, marketing nurture - potential fit needs development
-- Not ICP (<30): Disqualify - poor fit
-
-Respond with ONLY the tier name (tier_1, tier_2, tier_3, or not_icp) on the first line,
-followed by a brief explanation on subsequent lines."""
+- Not ICP (<30): Disqualify - poor fit"""
 
         # Build context about the lead and scores
         lead_context = f"""
@@ -371,26 +370,13 @@ Score Breakdown:
 """
 
         try:
-            response = await model.ainvoke([
+            structured_model = model.with_structured_output(TierDecision)
+            decision = cast(TierDecision, await structured_model.ainvoke([
                 SystemMessage(content=system_prompt),
                 HumanMessage(content=lead_context),
-            ])
+            ]))
 
-            content = str(response.content).strip()
-            lines = content.split("\n")
-            tier_str = lines[0].strip().lower()
-            reasoning = "\n".join(lines[1:]).strip() if len(lines) > 1 else ""
-
-            # Map response to tier
-            tier_map = {
-                "tier_1": QualificationTier.TIER_1,
-                "tier_2": QualificationTier.TIER_2,
-                "tier_3": QualificationTier.TIER_3,
-                "not_icp": QualificationTier.NOT_ICP,
-            }
-
-            final_tier = tier_map.get(tier_str, initial_tier)
-            return final_tier, reasoning
+            return decision.tier, decision.reasoning
 
         except Exception:
             # On any error, fall back to initial tier

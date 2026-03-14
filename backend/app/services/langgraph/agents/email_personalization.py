@@ -1,22 +1,26 @@
 """Email Personalization Agent for generating personalized outreach emails.
 
-Uses LLM to generate compelling, personalized emails based on
-research briefs, persona data, and email templates.
+Uses LLM with structured output to generate compelling, personalized emails
+based on research briefs, persona data, and email templates.
 
 Features:
+- with_structured_output() for reliable subject/body extraction
 - Human-in-the-loop approval workflow
 - PostgresSaver checkpointing for state persistence
 - Thread ID support for workflow tracking
 """
 
-import re
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 from typing import Any, cast
 
 from app.data.lead_schemas import Lead
 from app.services.langgraph.checkpointing import get_checkpointer
-from app.services.langgraph.states import EmailPersonalizationState, ResearchBrief
+from app.services.langgraph.states import (
+    EmailPersonalizationState,
+    EmailResponse,
+    ResearchBrief,
+)
 from app.services.langgraph.tools.email_tools import (
     build_email_prompt,
     extract_personalization_hooks,
@@ -82,7 +86,7 @@ class EmailPersonalizationAgent:
     async def _generate_email_node(
         self, state: EmailPersonalizationState
     ) -> dict[str, Any]:
-        """Generate email using LLM."""
+        """Generate email using LLM with structured output."""
         lead = state["lead"]
         research_brief = state.get("research_brief") or self._empty_brief()
         email_type = state.get("email_type", "pattern_interrupt")
@@ -100,16 +104,13 @@ class EmailPersonalizationAgent:
             personalization_hooks=hooks,
         )
 
-        # Generate with LLM (use self._llm to allow mocking)
-        response = await self._llm.ainvoke(prompt)
-        raw_content = str(response.content) if response.content else ""
-
-        # Parse immediately to avoid state issues
-        subject_line, email_body = self._parse_email_response(raw_content)
+        # Generate with structured output — returns EmailResponse directly
+        structured_llm = self._llm.with_structured_output(EmailResponse)
+        response = cast(EmailResponse, await structured_llm.ainvoke(prompt))
 
         return {
-            "subject_line": subject_line,
-            "email_body": email_body,
+            "subject_line": response.subject_line,
+            "email_body": response.email_body,
         }
 
     async def _parse_output_node(
@@ -119,44 +120,6 @@ class EmailPersonalizationAgent:
         return {
             "follow_up_note": None,
         }
-
-    def _parse_email_response(self, raw: str) -> tuple[str, str]:
-        """
-        Parse raw LLM response into subject and body.
-
-        Args:
-            raw: Raw LLM output
-
-        Returns:
-            Tuple of (subject_line, email_body)
-        """
-        lines = raw.strip().split("\n")
-        subject_line = ""
-        body_lines = []
-        found_subject = False
-
-        for line in lines:
-            # Look for subject line
-            if line.lower().startswith("subject:"):
-                subject_line = line.split(":", 1)[1].strip()
-                found_subject = True
-            elif found_subject:
-                # Everything after subject is body
-                body_lines.append(line)
-
-        # If no subject found, try to extract from first line
-        if not subject_line and lines:
-            subject_line = lines[0]
-            body_lines = lines[1:]
-
-        # Clean up body
-        body = "\n".join(body_lines).strip()
-
-        # Remove common markers
-        body = re.sub(r"\[Signature.*?\]", "", body, flags=re.IGNORECASE)
-        body = re.sub(r"\[Name\]", "", body)
-
-        return subject_line, body.strip()
 
     def _empty_brief(self) -> ResearchBrief:
         """Create an empty research brief."""

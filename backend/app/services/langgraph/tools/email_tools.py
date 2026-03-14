@@ -287,14 +287,8 @@ def build_email_prompt(
 **Subject Line Patterns (choose one or adapt):**
 {chr(10).join(f'- {p}' for p in list(template.get('subject_patterns', []))[:3])}
 
-**Output Format:**
-Subject: [Your subject line]
-
-[Email body - 3-5 sentences max]
-
-[Signature placeholder]
-
 Generate a compelling, personalized email that uses at least one personalization hook naturally.
+Do NOT include a signature placeholder or [Name] tag — just the email body text.
 """
 
     return prompt

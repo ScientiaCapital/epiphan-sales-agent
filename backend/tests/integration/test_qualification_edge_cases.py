@@ -12,7 +12,7 @@ import pytest
 
 from app.data.lead_schemas import Lead
 from app.services.langgraph.agents.qualification import QualificationAgent
-from app.services.langgraph.states import QualificationTier
+from app.services.langgraph.states import QualificationTier, TierDecision
 
 
 class TestIsEdgeCaseMethod:
@@ -254,15 +254,19 @@ class TestExtendedThinkingIntegration:
         )
         agent = QualificationAgent()
 
-        # Mock the LLM router's _claude_thinking (private attribute behind property)
-        mock_response = MagicMock()
-        mock_response.content = (
-            "tier_1\n"
-            "Despite the mid-market company size, the strong higher education "
-            "fit, AV Director title, and LMS presence indicate a priority lead."
+        # Mock with_structured_output chain for TierDecision
+        tier_decision = TierDecision(
+            tier=QualificationTier.TIER_1,
+            reasoning=(
+                "Despite the mid-market company size, the strong higher education "
+                "fit, AV Director title, and LMS presence indicate a priority lead."
+            ),
         )
+        mock_structured = MagicMock()
+        mock_structured.ainvoke = AsyncMock(return_value=tier_decision)
+
         mock_model = MagicMock()
-        mock_model.ainvoke = AsyncMock(return_value=mock_response)
+        mock_model.with_structured_output.return_value = mock_structured
         agent._router._claude_thinking = mock_model
 
         with patch(
@@ -312,10 +316,16 @@ class TestExtendedThinkingModelSelection:
             "buying_authority": {"raw_score": 5, "category": "unknown", "reason": "test", "confidence": 0.5},
         }
 
-        mock_response = MagicMock()
-        mock_response.content = "tier_2\nReasonable fit."
+        # Mock with_structured_output chain
+        tier_decision = TierDecision(
+            tier=QualificationTier.TIER_2,
+            reasoning="Reasonable fit.",
+        )
+        mock_structured = MagicMock()
+        mock_structured.ainvoke = AsyncMock(return_value=tier_decision)
+
         mock_model = MagicMock()
-        mock_model.ainvoke = AsyncMock(return_value=mock_response)
+        mock_model.with_structured_output.return_value = mock_structured
 
         # Mock the private attribute behind the property
         agent._router._claude_thinking = mock_model
@@ -328,8 +338,11 @@ class TestExtendedThinkingModelSelection:
             confidence=0.5,
         )
 
-        # Verify claude_with_thinking was used
-        mock_model.ainvoke.assert_called_once()
+        # Verify claude_with_thinking was used via with_structured_output
+        mock_model.with_structured_output.assert_called_once_with(TierDecision)
+        mock_structured.ainvoke.assert_called_once()
+        assert tier == QualificationTier.TIER_2
+        assert reasoning == "Reasonable fit."
 
     @pytest.mark.asyncio
     async def test_extended_thinking_fallback_on_error(self) -> None:
@@ -349,8 +362,12 @@ class TestExtendedThinkingModelSelection:
             "buying_authority": {"raw_score": 5, "category": "unknown", "reason": "test", "confidence": 0.5},
         }
 
+        # Error in with_structured_output chain
+        mock_structured = MagicMock()
+        mock_structured.ainvoke = AsyncMock(side_effect=Exception("API error"))
+
         mock_model = MagicMock()
-        mock_model.ainvoke = AsyncMock(side_effect=Exception("API error"))
+        mock_model.with_structured_output.return_value = mock_structured
         agent._router._claude_thinking = mock_model
 
         tier, reasoning = await agent._apply_extended_thinking(

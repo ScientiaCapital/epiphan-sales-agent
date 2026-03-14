@@ -1,8 +1,8 @@
 """Tests for coaching intelligence types — MEDDIC, DISC, Call Stage FSM, Partner Progress."""
 
-import pytest
 
 from app.data.coaching_schemas import (
+    TRANSITIONS,
     AccumulatedState,
     AudienceType,
     BookingSignal,
@@ -25,9 +25,7 @@ from app.data.coaching_schemas import (
     PartnerFamiliarity,
     PartnerProgress,
     SpecInStatus,
-    TRANSITIONS,
 )
-
 
 # =============================================================================
 # CallStage

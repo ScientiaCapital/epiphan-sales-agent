@@ -2,11 +2,16 @@
 
 State schemas use TypedDict to define the structure of state
 that flows through each agent's graph nodes.
+
+Pydantic BaseModel schemas are used for with_structured_output() responses
+from LLM calls, providing type-safe parsing at the LLM boundary.
 """
 
 from enum import Enum
 from operator import add
 from typing import Annotated, Any, TypedDict
+
+from pydantic import BaseModel, Field
 
 from app.data.lead_schemas import Lead
 
@@ -25,6 +30,42 @@ class QualificationTier(str, Enum):
     TIER_2 = "tier_2"
     TIER_3 = "tier_3"
     NOT_ICP = "not_icp"
+
+
+# =============================================================================
+# Structured Output Models (for with_structured_output())
+# =============================================================================
+
+
+class TierDecision(BaseModel):
+    """Structured response from extended thinking tier evaluation.
+
+    Used by QualificationAgent._apply_extended_thinking() to get
+    reliable tier decisions instead of manual string parsing.
+    """
+
+    tier: QualificationTier = Field(
+        description="The qualification tier for this lead"
+    )
+    reasoning: str = Field(
+        default="",
+        description="Brief explanation of why this tier was chosen",
+    )
+
+
+class EmailResponse(BaseModel):
+    """Structured response from email generation LLM call.
+
+    Used by EmailPersonalizationAgent to get clean subject/body
+    separation instead of regex-based parsing.
+    """
+
+    subject_line: str = Field(
+        description="Email subject line, concise and personalized"
+    )
+    email_body: str = Field(
+        description="Email body text, 3-7 sentences, no signature placeholder"
+    )
 
 
 class DimensionScore(TypedDict):
