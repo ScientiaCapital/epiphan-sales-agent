@@ -2,12 +2,14 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.agents import router as agents_router
 from app.api.routes.auth import router as auth_router
+from app.api.routes.autonomous import router as autonomous_router
 from app.api.routes.batch import router as batch_router
 from app.api.routes.call_brief import router as call_brief_router
 from app.api.routes.call_outcomes import router as call_outcomes_router
@@ -21,6 +23,53 @@ from app.api.routes.scripts import router as scripts_router
 from app.api.routes.webhooks import router as webhooks_router
 from app.core.config import settings
 from app.core.rate_limit import setup_rate_limiting
+
+_scheduler: Any = None
+
+
+def _start_scheduler() -> None:
+    """Start the autonomous BDR pipeline scheduler (2 AM ET daily)."""
+    global _scheduler  # noqa: PLW0603
+
+    try:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+        from apscheduler.triggers.cron import CronTrigger
+
+        _scheduler = AsyncIOScheduler()
+        _scheduler.add_job(
+            _run_autonomous_pipeline,
+            CronTrigger(hour=2, timezone="US/Eastern"),
+            id="autonomous_bdr_pipeline",
+            name="Nightly BDR Pipeline",
+            replace_existing=True,
+        )
+        _scheduler.start()
+        print("Autonomous BDR scheduler started (2 AM ET daily)")
+    except ImportError:
+        print("APScheduler not installed — autonomous scheduling disabled")
+    except Exception as e:
+        print(f"Scheduler startup failed: {e}")
+
+
+def _stop_scheduler() -> None:
+    """Shut down the scheduler gracefully."""
+    global _scheduler  # noqa: PLW0603
+
+    if _scheduler is not None:
+        _scheduler.shutdown(wait=False)
+        _scheduler = None
+
+
+async def _run_autonomous_pipeline() -> None:
+    """Cron callback: run the autonomous BDR pipeline."""
+    try:
+        from app.services.autonomous.runner import autonomous_runner
+
+        await autonomous_runner.run()
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception("Scheduled autonomous run failed")
 
 
 def _validate_production_secrets() -> None:
@@ -54,9 +103,13 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     print(f"Environment: {settings.environment}")
     _validate_production_secrets()
 
+    # Start autonomous pipeline scheduler
+    _start_scheduler()
+
     yield
 
     # Shutdown
+    _stop_scheduler()
     print("Shutting down...")
 
 
@@ -110,3 +163,4 @@ app.include_router(call_outcomes_router)  # Already has /api/call-outcomes prefi
 app.include_router(monitoring_router)  # Already has /api/monitoring prefix - Track the gold spend!
 app.include_router(call_session_router)  # Already has /api/call-session prefix - Voice AI REST fallback
 app.include_router(call_session_ws_router)  # WebSocket: /ws/call-session - Voice AI live call support
+app.include_router(autonomous_router)  # Already has /api/autonomous prefix - Nightly BDR pipeline

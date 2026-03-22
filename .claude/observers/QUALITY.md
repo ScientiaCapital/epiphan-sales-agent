@@ -1,8 +1,8 @@
 # Observer: Code Quality Report
 
-**Date:** 2026-03-14
+**Date:** 2026-03-22
 **Project:** epiphan-sales-agent
-**Session:** session-3 (OpenRouter + Coaching Agent + Call Brief)
+**Session:** session-4 (Autonomous BDR Pipeline)
 
 ---
 
@@ -14,17 +14,18 @@ None.
 
 ## Warnings (fix or log to backlog)
 
-None for today's changes. All new code follows established patterns.
+- [W1] **Local .env has local Supabase credentials** — SUPABASE_URL points to 127.0.0.1:54321, not cloud. Pipeline works in production (Railway) but local testing requires manual override. **Action:** Add cloud credentials to .env or create .env.cloud.
 
 ---
 
 ## Info
 
-- [INFO] — `except Exception:` count: 50 across 18 files. All intentional graceful degradation with `logger.exception()`. New coaching agent adds 2 (fallback to defaults on LLM failure).
-- [INFO] — No TODO/FIXME/HACK/XXX markers in any changed files (0 debt introduced).
-- [INFO] — No hardcoded secrets detected in source files.
-- [INFO] — New `coaching.py` agent has 13 tests covering happy path, degradation, invariants, LLM routing.
-- [INFO] — `_safe_coaching_context()` in call_brief.py follows established `_safe_*()` pattern with lazy imports.
+- [INFO] — `except Exception:` count: ~58 across 22 files. Autonomous pipeline adds 8 new ones, all intentional graceful degradation with `logger.exception()`. Follows `_safe_*()` pattern from call_brief.py.
+- [INFO] — No TODO/FIXME/HACK markers in any new files (0 debt introduced).
+- [INFO] — No hardcoded secrets detected. Security scan clean.
+- [INFO] — New autonomous module has 40 tests covering schemas, dedup, drafter, learner, runner, and sourcer.
+- [INFO] — APScheduler added as dependency for cron scheduling (2 AM ET daily).
+- [INFO] — 3 new Supabase tables created via migration: autonomous_runs, outreach_queue, approval_patterns.
 
 ---
 
@@ -32,12 +33,12 @@ None for today's changes. All new code follows established patterns.
 
 | Metric | Value |
 |--------|-------|
-| Files scanned | 8 (changed today) |
+| Files scanned | 15 (new) + 2 (modified) |
 | Critical findings | 0 |
-| Warnings | 0 |
-| Tests | 1478 passed, 0 failed |
+| Warnings | 1 (local env config) |
+| Tests | 1466 passed, 0 failed |
 | Ruff lint | 0 errors |
-| mypy | 0 errors (102 files) |
+| mypy | 0 errors |
 
 ---
 
@@ -45,6 +46,6 @@ None for today's changes. All new code follows established patterns.
 
 | Date | Session | Task | Files Checked | Findings | Status |
 |------|---------|------|--------------|----------|--------|
+| 2026-03-22 | session-4 | Autonomous BDR Pipeline | 17 | 0C / 1W / 6I | Complete |
 | 2026-03-14 | session-3 | OpenRouter + Coaching Agent + Call Brief | 8 | 0C / 0W / 5I | Complete |
 | 2026-02-22 | prod-deploy | Production deploy to Railway + Supabase | 6 | 0C / 4W / 4I | Complete |
-| 2026-02-22 | security-hardening | API key separation + mypy cleanup | 10 | 0C / 2W-resolved / 2W-backlog | Complete |
