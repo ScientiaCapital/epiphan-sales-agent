@@ -1,10 +1,29 @@
 # Project Context: epiphan-sales-agent
 
-**Updated:** 2026-03-22 (Session 4)
+**Updated:** 2026-06-19 (Session 5)
 **Branch:** main
 **Tech Stack:** Python 3.12, FastAPI, LangGraph 1.1.2, Supabase, Railway
 
 ---
+
+## Done (2026-06-19) — Session 5: Pivot to Nooks Autopilot (Claude+MCP skill)
+
+**Major direction change.** Tim's autonomous BDR/SDR team now runs as a **scheduled Claude skill
+on the MCP stack** (Epiphan AI + HubSpot + Nooks + Apollo/Clay), NOT this FastAPI backend. The
+Session-4 backend pipeline is **superseded** for the live motion (its run_id/add_task bugs are
+non-blocking — decide later whether to fix or retire).
+
+- **Built `nooks-autopilot` skill** (`~/.claude/skills/nooks-autopilot/`): find → qualify → route →
+  enroll into a **Nooks** sequence → monitor → hand off a warm/replied lead. Shadow-first.
+  Per-rep agents (Tim/Edgar/Vasil/Nyasha), **one owner per lead** (`sdr_owner`), **one SDR per
+  account** multi-thread guard, always-on **DA audit** (no live Lex/Phil deals, no 12-mo buyers).
+- **Full shadow pass** on 50 candidates across 5 HubSpot `[AI]` lists — guards verified (double-dial,
+  customers, AE-owned, gate-fix); published per-rep dial-list Artifact. Zero writes.
+- **New private GitHub repo `ScientiaCapital/epiphan-sdr-skills`** (3 commits, 29 files): 13
+  Tim-authored skills + 6 process playbooks + 2 conversion-intel docs. PII-scanned, gitleaks-clean.
+- **Memory saved** (3 files): project_nooks_autopilot, reference_nooks_autopilot_ids, feedback_nooks_autopilot_guards.
+
+Backend repo: **0 commits today** (work was skills + repo + memory).
 
 ## Production Environment
 - **API**: https://epiphan-api-production.up.railway.app
@@ -39,14 +58,15 @@
 7. Coaching Agent — real-time MEDDIC/DISC coaching during calls
 8. **Autonomous BDR Pipeline** — nightly prospect-to-outreach loop with human approval
 
-## Tomorrow
+## Tomorrow (nooks-autopilot → live)
 
-1. **Update .env with production Supabase credentials** — local .env points to 127.0.0.1:54321. Need cloud service_key for local testing of autonomous pipeline.
-2. **Deploy to Railway** — new module has 1 new dep (apscheduler). Verify env vars set. Test `POST /api/autonomous/run` on production.
-3. **First live run** — Trigger with `{"prospect_limit": 5}` to validate end-to-end: Apollo search → enrichment → qualification → Challenger Sale email drafting → Supabase queue → morning review.
-4. **Wire coaching into WebSocket** — Carried from session 3. Connect coaching agent to live call WebSocket.
+Before flipping `SHADOW_MODE=false`, close 3 build-time items (all noted in the skill):
+1. **Map non-standard HubSpot lifecycle-stage IDs** (e.g. `1028712882`, `970063423`) so the DA/in-deal guard is exact — don't enroll someone mid-deal.
+2. **Division of labor vs the existing Epiphan AI prospecting agent** (it also sets `epiphan_ai_status`/enrolls via Apollo) — define hands-off so no lead is double-worked.
+3. **Nyasha's Nooks mailbox** — get it connected so her auto-email touches fire (currently call/LinkedIn-only).
+Then: live smoke test — enroll 1 test contact (verify Nooks `listSequenceStates` active + `[Epiphan AI] Enrolled`), reply from test inbox → monitor halts + `[Epiphan AI] Replied` + warm task.
 
-Tomorrow: Deploy autonomous pipeline to Railway + first live run via /build | sonnet | Est: short | Observer notes: [R4] APScheduler fine for 1 worker, [W1] need cloud Supabase creds in local .env
+Tomorrow: nooks-autopilot live-readiness (lifecycle-stage map + agent division-of-labor) | sonnet | Est: short | Note: backend pipeline superseded — decide fix-or-retire separately
 
 ---
 
