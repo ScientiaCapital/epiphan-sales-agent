@@ -2,6 +2,16 @@
 
 AI-powered sales assistant for Epiphan Video BDR — warm call scripts, lead enrichment, ICP scoring, and CRM integration via LangGraph agents.
 
+> **⚠ Direction update (2026-06-19, Session 5).** The **live autonomous BDR/SDR motion now runs as a
+> scheduled Claude skill on the MCP stack** (Epiphan AI + HubSpot + Nooks + Apollo/Clay), **not** this
+> FastAPI backend. See the **`nooks-autopilot`** skill in `~/.claude/skills/` and the repo
+> **`ScientiaCapital/epiphan-sdr-skills`** (skills + playbooks + conversion intel). This backend's
+> Session-4 "Autonomous BDR Pipeline" (`backend/app/services/autonomous/`) is **superseded for the live
+> motion** — keep it documented here for maintenance, but new BDR/SDR automation goes in the skill repo.
+> It also has 2 open, currently non-blocking bugs in `api/routes/autonomous.py` (run_id mismatch;
+> `add_task(asyncio.ensure_future, …)`) — decide fix-or-retire separately. Full context in
+> `.claude/PROJECT_CONTEXT.md` + the `project_nooks_autopilot` memory.
+
 ## Stack
 
 - **Language**: Python 3.10+
